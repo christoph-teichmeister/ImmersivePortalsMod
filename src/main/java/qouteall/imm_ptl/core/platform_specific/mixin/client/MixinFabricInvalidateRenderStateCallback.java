@@ -12,7 +12,7 @@ import qouteall.imm_ptl.core.ClientWorldLoader;
 @Mixin(value = InvalidateRenderStateCallback.class, remap = false)
 public interface MixinFabricInvalidateRenderStateCallback {
     @Inject(
-        method = "lambda$static$0",
+        method = "lambda$static$1", // the invoker body; $0 is the array-backed factory
         at = @At("HEAD"),
         cancellable = true
     )

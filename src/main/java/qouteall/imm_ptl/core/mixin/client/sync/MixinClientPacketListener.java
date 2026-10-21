@@ -1,6 +1,9 @@
 package qouteall.imm_ptl.core.mixin.client.sync;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.CommonListenerCookie;
@@ -58,7 +61,7 @@ public abstract class MixinClientPacketListener implements IEClientPlayNetworkHa
     public abstract void handleSetEntityPassengersPacket(ClientboundSetPassengersPacket entityPassengersSetS2CPacket_1);
     
     @Shadow
-    protected abstract void applyLightData(int x, int z, ClientboundLightUpdatePacketData data);
+    protected abstract void applyLightData(int x, int z, ClientboundLightUpdatePacketData data, boolean scheduleRebuild);
     
     @Shadow
     @Final
@@ -270,6 +273,30 @@ public abstract class MixinClientPacketListener implements IEClientPlayNetworkHa
 //        ci.cancel();
 //
 //    }
+    
+    /**
+     * 26.x handleRespawn shows the loading screen with a forced frame (setScreenAndShow) after switching
+     * the level but before the new player exists. The client world map was just cleaned up then and
+     * IP's per-frame logic cannot run, so only set the screen there, like 1.21.1 did.
+     */
+    @WrapOperation(
+        method = "startWaitingForNewLevel",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/Minecraft;setScreenAndShow(Lnet/minecraft/client/gui/screens/Screen;)V"
+        )
+    )
+    private void wrapSetScreenAndShow(Minecraft minecraft, Screen screen, Operation<Void> original) {
+        if (minecraft.player != null && minecraft.player.level() != minecraft.level) {
+            //? if >=26.2 {
+            minecraft.gui.setScreen(screen);
+            //?} else {
+            /*minecraft.setScreen(screen);
+            *///?}
+            return;
+        }
+        original.call(minecraft, screen);
+    }
     
     // for debugging
     @Inject(
