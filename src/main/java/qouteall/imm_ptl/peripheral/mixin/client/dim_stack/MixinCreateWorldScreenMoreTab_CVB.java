@@ -15,10 +15,10 @@ import qouteall.imm_ptl.peripheral.ducks.IECreateWorldScreen;
 
 @Mixin(CreateWorldScreen.MoreTab.class)
 public class MixinCreateWorldScreenMoreTab_CVB {
-    // the implicit parent object reference
+    // the implicit parent object reference (MC is no longer obfuscated, so it has its javac name)
     @Final
     @Shadow
-    CreateWorldScreen field_42178;
+    CreateWorldScreen this$0;
     
     @Inject(
         method = "<init>",
@@ -32,7 +32,7 @@ public class MixinCreateWorldScreenMoreTab_CVB {
         rowHelper.addChild(
             Button.builder(
                 Component.translatable("imm_ptl.altius_screen_button"),
-                button -> ((IECreateWorldScreen) field_42178).ip_openDimStackScreen()
+                button -> ((IECreateWorldScreen) this$0).ip_openDimStackScreen()
             ).width(210).build()
         );
     }
