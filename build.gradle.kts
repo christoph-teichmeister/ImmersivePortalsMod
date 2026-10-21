@@ -24,12 +24,22 @@ dependencies {
     compileOnly("maven.modrinth:modmenu:${property("deps.modmenu")}")
     localRuntime("maven.modrinth:modmenu:${property("deps.modmenu")}")
 
-    // compat code only; not on the dev runtime until Sodium/Iris compat is ported
-    compileOnly("maven.modrinth:sodium:${property("deps.sodium")}")
-    compileOnly("maven.modrinth:iris:${property("deps.iris")}")
-
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+}
+
+// re-enabled with the Sodium/Iris compat port
+// (IrisInterface/SodiumInterface stay compiled as no-op bridges)
+sourceSets.main {
+    java {
+        exclude {
+            val p = it.relativePath.pathString
+            (p.startsWith("qouteall/imm_ptl/core/compat/iris_compatibility/") && !p.endsWith("/IrisInterface.java")) ||
+                (p.startsWith("qouteall/imm_ptl/core/compat/sodium_compatibility/") && !p.endsWith("/SodiumInterface.java")) ||
+                p.startsWith("qouteall/imm_ptl/core/compat/mixin/iris/") ||
+                p.startsWith("qouteall/imm_ptl/core/compat/mixin/sodium/")
+        }
+    }
 }
 
 loom {

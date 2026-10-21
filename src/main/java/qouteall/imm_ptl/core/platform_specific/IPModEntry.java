@@ -5,7 +5,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import qouteall.imm_ptl.core.IPModMain;
-import qouteall.imm_ptl.core.compat.GravityChangerInterface;
 import qouteall.q_misc_util.Helper;
 
 public class IPModEntry implements ModInitializer {
@@ -27,14 +26,6 @@ public class IPModEntry implements ModInitializer {
         }
         else {
             Helper.log("Dimensional Threading is not present");
-        }
-        
-        if (FabricLoader.getInstance().isModLoaded("gravity_changer_q")) {
-            GravityChangerInterface.invoker = new GravityChangerInterface.OnGravityChangerPresent();
-            Helper.log("Gravity API is present");
-        }
-        else {
-            Helper.log("Gravity API is not present");
         }
         
     }
