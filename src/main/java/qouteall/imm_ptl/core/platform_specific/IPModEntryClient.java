@@ -1,6 +1,7 @@
 package qouteall.imm_ptl.core.platform_specific;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -28,6 +29,8 @@ import qouteall.imm_ptl.core.render.LoadingIndicatorRenderer;
 import qouteall.imm_ptl.core.render.PortalEntityRenderer;
 import qouteall.q_misc_util.Helper;
 import qouteall.q_misc_util.my_util.MyTaskList;
+
+import org.spongepowered.asm.mixin.MixinEnvironment;
 
 import java.util.Arrays;
 
@@ -109,6 +112,11 @@ public class IPModEntryClient implements ClientModInitializer {
         }
         
         IPModInfoChecking.initClient();
+        
+        // dev check (-Dimm_ptl.mixin_audit=true, gradle -PmixinAudit): force-load every mixin target
+        if (Boolean.getBoolean("imm_ptl.mixin_audit")) {
+            ClientLifecycleEvents.CLIENT_STARTED.register(c -> MixinEnvironment.getCurrentEnvironment().audit());
+        }
     }
     
 }

@@ -48,6 +48,12 @@ loom {
 
     runConfigs.all {
         runDirectory = rootProject.file("run") // shared between versions
+        // -PmixinAudit: verify every mixin and force-load all targets at startup (README, Development)
+        if (project.hasProperty("mixinAudit")) vmArgs("-Dmixin.debug.verify=true", "-Dimm_ptl.mixin_audit=true")
+    }
+    // -PquickPlay=<world folder in run/saves>: the client opens that world directly
+    runConfigs.named("client") {
+        project.findProperty("quickPlay")?.let { programArgs("--quickPlaySingleplayer", it.toString()) }
     }
 }
 
@@ -75,6 +81,10 @@ tasks {
 
     test {
         useJUnitPlatform()
+    }
+
+    named<JavaExec>("runServer") {
+        standardInput = System.`in` // server console commands
     }
 
     jar {
