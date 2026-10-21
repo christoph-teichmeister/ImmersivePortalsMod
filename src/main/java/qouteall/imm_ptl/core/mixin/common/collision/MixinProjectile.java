@@ -12,26 +12,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class MixinProjectile extends MixinEntity {
     
     // make it recognize the owner in another dimension
-    @Redirect(
-        method = "getOwner",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/server/level/ServerLevel;getEntity(Ljava/util/UUID;)Lnet/minecraft/world/entity/Entity;"
-        )
-    )
-    private Entity redirectGetEntityFromUuid(
-        net.minecraft.server.level.ServerLevel serverLevel,
-        java.util.UUID uuid
-    ) {
-        MinecraftServer server = serverLevel.getServer();
-        for (ServerLevel world : server.getAllLevels()) {
-            Entity entity = world.getEntity(uuid);
-            if (entity != null) {
-                return entity;
-            }
-        }
-        return null;
-    }
+    // 26.x: removed the redirect of ServerLevel.getEntity(UUID) in getOwner. Vanilla getOwner now
+    // resolves the owner through EntityReference -> Level.getEntityInAnyDimension, which already
+    // searches all dimensions (the redirect target no longer exists there).
     
 //    @Shadow
 //    public abstract void onHit(HitResult hitResult);

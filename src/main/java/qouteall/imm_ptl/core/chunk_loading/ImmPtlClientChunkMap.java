@@ -3,6 +3,8 @@ package qouteall.imm_ptl.core.chunk_loading;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import java.util.Map;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientChunkCache;
@@ -137,18 +139,26 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
     }
     
     @Override
+    //? if >=26.3 {
     public LevelChunk replaceWithPacketData(
+        int x, int z, ClientboundLevelChunkPacketData chunkData
+    ) {
+        Consumer<LevelChunk> loader = c -> c.replaceWithPacketData(x, z, chunkData);
+    //?} else {
+    /*public LevelChunk replaceWithPacketData(
         int x, int z,
-        FriendlyByteBuf buf, CompoundTag nbt,
+        FriendlyByteBuf buf, Map<Heightmap.Types, long[]> heightmaps,
         Consumer<ClientboundLevelChunkPacketData.BlockEntityTagOutput> consumer
     ) {
+        Consumer<LevelChunk> loader = c -> c.replaceWithPacketData(buf, heightmaps, consumer);
+    *///?}
         Validate.isTrue(Thread.currentThread() == mainThread);
         
         long chunkPosLong = ChunkPos.pack(x, z);
         LevelChunk worldChunk = chunkMapForMainThread.get(chunkPosLong);
         if (worldChunk == null) {
             worldChunk = new LevelChunk(this.level, new ChunkPos(x, z));
-            loadChunkDataFromPacket(buf, nbt, worldChunk, consumer);
+            loadChunkDataFromPacket(worldChunk, loader);
             
             LevelChunk worldChunkToPut = worldChunk; // lambda can only capture effectively final variables
             modifyChunkMap(chunkMap -> {
@@ -156,7 +166,7 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
             });
         }
         else {
-            loadChunkDataFromPacket(buf, nbt, worldChunk, consumer);
+            loadChunkDataFromPacket(worldChunk, loader);
         }
         
         this.level.onChunkLoaded(new ChunkPos(x, z));
@@ -174,13 +184,11 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
      * {@link net.minecraft.world.level.chunk.LinearPalette#read(FriendlyByteBuf)}
      */
     private void loadChunkDataFromPacket(
-        FriendlyByteBuf buf,
-        CompoundTag nbt,
         LevelChunk worldChunk,
-        Consumer<ClientboundLevelChunkPacketData.BlockEntityTagOutput> consumer
+        Consumer<LevelChunk> loader
     ) {
         try {
-            worldChunk.replaceWithPacketData(buf, nbt, consumer);
+            loader.accept(worldChunk);
         }
         catch (Exception e) {
             LOGGER.error(
@@ -234,8 +242,14 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
     
     @Override
     public void onLightUpdate(LightLayer lightType, SectionPos chunkSectionPos) {
-        ClientWorldLoader.getWorldRenderer(level.dimension())
+        //? if >=26.2 {
+        ClientWorldLoader.getWorld(level.dimension()); // make sure the per-dimension objects exist
+        ClientWorldLoader.LEVEL_EXTRACTOR_MAP.get(level.dimension())
             .setSectionDirty(chunkSectionPos.x(), chunkSectionPos.y(), chunkSectionPos.z());
+        //?} else {
+        /*ClientWorldLoader.getWorldRenderer(level.dimension())
+            .setSectionDirty(chunkSectionPos.x(), chunkSectionPos.y(), chunkSectionPos.z());
+        *///?}
     }
     
 }

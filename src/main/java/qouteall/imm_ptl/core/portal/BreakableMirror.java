@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.core.portal;
 
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -28,7 +29,7 @@ import java.util.function.Predicate;
 public class BreakableMirror extends Mirror {
     
     public static final EntityType<BreakableMirror> ENTITY_TYPE =
-        createPortalEntityType(BreakableMirror::new);
+        createPortalEntityType("breakable_mirror", BreakableMirror::new);
     
     @Nullable
     public IntBox wallArea;
@@ -93,7 +94,7 @@ public class BreakableMirror extends Mirror {
     @Override
     public void tick() {
         super.tick();
-        if (!level().isClientSide) {
+        if (!level().isClientSide()) {
             if (!unbreakable) {
                 if (level().getGameTime() % 10 == getId() % 10) {
                     checkWallIntegrity();
@@ -170,7 +171,7 @@ public class BreakableMirror extends Mirror {
             return null;
         }
         
-        BreakableMirror breakableMirror = BreakableMirror.ENTITY_TYPE.create(world);
+        BreakableMirror breakableMirror = BreakableMirror.ENTITY_TYPE.create(world, EntitySpawnReason.TRIGGERED);
         assert breakableMirror != null;
         double distanceToCenter = isPane ? (1.0 / 16) : 0.5;
         

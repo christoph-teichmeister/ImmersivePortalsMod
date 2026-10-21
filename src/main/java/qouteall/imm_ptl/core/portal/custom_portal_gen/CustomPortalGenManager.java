@@ -204,7 +204,7 @@ public class CustomPortalGenManager {
             return;
         }
         
-        ServerTaskList.of(entity.getServer()).addTask(() -> {
+        ServerTaskList.of(entity.level().getServer()).addTask(() -> {
             for (CustomPortalGeneration gen : gens) {
                 boolean result = gen.perform(
                     ((ServerLevel) entity.level()),

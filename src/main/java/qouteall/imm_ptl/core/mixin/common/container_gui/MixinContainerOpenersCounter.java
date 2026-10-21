@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.core.mixin.common.container_gui;
 
+import net.minecraft.world.entity.ContainerUser;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,14 +23,18 @@ public abstract class MixinContainerOpenersCounter {
     
     // the container could be opened via portal. the player could be anywhere in any dimension
     // check all players
-    @Inject(method = "getPlayersWithContainerOpen", at = @At("HEAD"), cancellable = true)
-    private void getOpenCount(Level level, BlockPos pos, CallbackInfoReturnable<List<Player>> cir) {
-        List<Player> list = new ArrayList<>();
-        
+    // 26.x: getPlayersWithContainerOpen became getEntitiesWithContainerOpen (non-player users exist too),
+    // so keep the vanilla result and add the players that opened it from elsewhere
+    @Inject(method = "getEntitiesWithContainerOpen", at = @At("RETURN"), cancellable = true)
+    private void getOpenCount(Level level, BlockPos pos, CallbackInfoReturnable<List<ContainerUser>> cir) {
         MinecraftServer server = level.getServer();
-        assert server != null;
+        if (server == null) {
+            return;
+        }
+        
+        List<ContainerUser> list = new ArrayList<>(cir.getReturnValue());
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if (isOwnContainer(player)) {
+            if (!player.isSpectator() && isOwnContainer(player) && !list.contains(player)) {
                 list.add(player);
             }
         }

@@ -2,6 +2,7 @@ package qouteall.imm_ptl.core.portal.global_portals;
 
 import com.google.common.base.Supplier;
 import com.google.common.collect.Streams;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -37,7 +38,7 @@ public class BorderBarrierFiller {
         ).findFirst().orElse(null);
         
         if (zone == null) {
-            player.displayClientMessage(Component.translatable("imm_ptl.cannot_find_zone"), false);
+            player.sendSystemMessage(Component.translatable("imm_ptl.cannot_find_zone"), false);
             return;
         }
         
@@ -58,7 +59,7 @@ public class BorderBarrierFiller {
         ).findFirst().orElse(null);
         
         if (zone == null) {
-            player.displayClientMessage(Component.translatable("imm_ptl.cannot_find_zone"), false);
+            player.sendSystemMessage(Component.translatable("imm_ptl.cannot_find_zone"), false);
             return;
         }
         
@@ -82,7 +83,7 @@ public class BorderBarrierFiller {
             // according to my test 80000 columns increase world saving by 465 MB
             double sizeEstimationGB = (totalColumns / 80000.0) * 0.5;
             
-            player.displayClientMessage(
+            player.sendSystemMessage(
                 Component.translatable(
                     "imm_ptl.clear_border_warning",
                     sizeEstimationGB < 0.01 ? 0 : sizeEstimationGB
@@ -93,13 +94,13 @@ public class BorderBarrierFiller {
         else {
             warnedPlayers.remove(player);
             
-            player.displayClientMessage(
+            player.sendSystemMessage(
                 Component.translatable("imm_ptl.start_clearing_border"),
                 false
             );
             
             
-            startFillingBorder(world, borderBox, l -> player.displayClientMessage(l, false));
+            startFillingBorder(world, borderBox, l -> player.sendSystemMessage(l, false));
         }
     }
     
@@ -138,7 +139,8 @@ public class BorderBarrierFiller {
                 ChunkAccess chunk = world.getChunk(columnPos);
                 for (int y = minY; y < maxYEx; y++) {
                     temp1.set(columnPos.getX(), y, columnPos.getZ());
-                    chunk.setBlockState(temp1, Blocks.AIR.defaultBlockState(), false);
+                    // 26.x: flags instead of isMoving; UPDATE_NEIGHBORS keeps the 1.21.1 server-side onRemove behaviour
+                    chunk.setBlockState(temp1, Blocks.AIR.defaultBlockState(), Block.UPDATE_NEIGHBORS);
                     lightingProvider.checkBlock(temp1);
                 }
                 

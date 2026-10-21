@@ -4,7 +4,9 @@ import com.mojang.logging.LogUtils;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.util.Util;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -44,7 +46,7 @@ public class CHelper {
     
     public static PlayerInfo getClientPlayerListEntry() {
         return Minecraft.getInstance().getConnection().getPlayerInfo(
-            Minecraft.getInstance().player.getGameProfile().getId()
+            Minecraft.getInstance().player.getGameProfile().id()
         );
     }
     
@@ -91,32 +93,60 @@ public class CHelper {
     }
     
     public static void printChat(Component text) {
-        Minecraft.getInstance().gui.getChat().addMessage(text);
+        getChat().addClientSystemMessage(text);
+    }
+    
+    // version-neutral wrappers for client APIs that moved between 26.1 and 26.2
+    
+    public static ChatComponent getChat() {
+        //? if >=26.2 {
+        return Minecraft.getInstance().gui.hud.getChat();
+        //?} else {
+        /*return Minecraft.getInstance().gui.getChat();*/
+        //?}
+    }
+    
+    public static void setOverlayMessage(Component text, boolean animate) {
+        //? if >=26.2 {
+        Minecraft.getInstance().gui.hud.setOverlayMessage(text, animate);
+        //?} else {
+        /*Minecraft.getInstance().gui.setOverlayMessage(text, animate);*/
+        //?}
+    }
+    
+    public static void setScreen(@Nullable Screen screen) {
+        //? if >=26.2 {
+        Minecraft.getInstance().gui.setScreen(screen);
+        //?} else {
+        /*Minecraft.getInstance().setScreen(screen);*/
+        //?}
+    }
+    
+    public static Camera getMainCamera() {
+        //? if >=26.2 {
+        return Minecraft.getInstance().gameRenderer.mainCamera();
+        //?} else {
+        /*return Minecraft.getInstance().gameRenderer.getMainCamera();*/
+        //?}
     }
     
     public static void openLinkConfirmScreen(
         Screen parent,
         String link
     ) {
-        Minecraft client = Minecraft.getInstance();
-        client.setScreen(new ConfirmLinkScreen(
-            (result) -> {
-                if (result) {
-                    try {
-                        Util.getPlatform().openUri(new URI(link));
-                    }
-                    catch (URISyntaxException e) {
-                        e.printStackTrace();
-                    }
-                }
-                client.setScreen(parent);
-            },
-            link, true
-        ));
+        URI uri;
+        try {
+            uri = new URI(link);
+        }
+        catch (URISyntaxException e) {
+            LOGGER.error("Invalid link {}", link, e);
+            return;
+        }
+        ConfirmLinkScreen.confirmLinkNow(parent, uri, true);
     }
     
     public static Vec3 getCurrentCameraPos() {
-        return Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        return getMainCamera().position();
     }
     
     public static Iterable<Entity> getWorldEntityList(Level world) {

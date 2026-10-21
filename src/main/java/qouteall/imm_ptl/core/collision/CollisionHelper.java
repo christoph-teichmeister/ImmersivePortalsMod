@@ -525,13 +525,13 @@ public class CollisionHelper {
     @Environment(EnvType.CLIENT)
     private static void updateClientStagnateStatus() {
         if (thisTickStagnate && lastTickStagnate) {
-            Minecraft.getInstance().gui.setOverlayMessage(
+            CHelper.setOverlayMessage(
                 Component.translatable("imm_ptl.stagnate_movement"),
                 false
             );
         }
         else if (!thisTickStagnate && lastTickStagnate) {
-            Minecraft.getInstance().gui.setOverlayMessage(
+            CHelper.setOverlayMessage(
                 Component.literal(""),
                 false
             );

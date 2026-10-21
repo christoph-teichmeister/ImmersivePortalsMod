@@ -79,7 +79,7 @@ public class MiscNetworking {
         }
         
         public static Packet<ClientCommonPacketListener> createPacket(MinecraftServer server) {
-            return ServerPlayNetworking.createS2CPacket(
+            return ServerPlayNetworking.createClientboundPacket(
                 DimIdSyncPacket.createFromServer(server)
             );
         }
@@ -104,7 +104,7 @@ public class MiscNetworking {
             ImmutableMap.Builder<ResourceKey<Level>, ResourceKey<DimensionType>> builder =
                 new ImmutableMap.Builder<>();
             
-            for (String key : dimTypeTag.getAllKeys()) {
+            for (String key : dimTypeTag.keySet()) {
                 ResourceKey<Level> dimId = ResourceKey.create(
                     Registries.DIMENSION,
                     McHelper.newResourceLocation(key)
@@ -142,7 +142,7 @@ public class MiscNetworking {
     }
     
     public static void init() {
-        PayloadTypeRegistry.playS2C().register(
+        PayloadTypeRegistry.clientboundPlay().register(
             DimIdSyncPacket.TYPE, DimIdSyncPacket.CODEC
         );
     }

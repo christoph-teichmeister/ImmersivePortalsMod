@@ -517,7 +517,7 @@ public class Helper {
         Tag term = tag.get(tagName);
         
         if (term instanceof StringTag) {
-            String id = ((StringTag) term).getAsString();
+            String id = ((StringTag) term).value();
             return dimIdToKey(id);
         }
         
@@ -677,7 +677,7 @@ public class Helper {
                 compoundTag.getDoubleOr(name + "X", 0.0),
                 compoundTag.getDoubleOr(name + "Y", 0.0),
                 compoundTag.getDoubleOr(name + "Z", 0.0),
-                compoundTag.getDouble(name + "W")
+                compoundTag.getDoubleOr(name + "W", 0.0)
             );
         }
         else {
@@ -1454,6 +1454,23 @@ public class Helper {
         );
     }
     
+    /**
+     * Replaces 1.21.1 ListTag.getElementType(): 26.x lists may be heterogeneous.
+     * Returns the common element type id, or 0 (TAG_END) when empty or mixed.
+     */
+    public static byte getListElementType(ListTag listTag) {
+        if (listTag.isEmpty()) {
+            return Tag.TAG_END;
+        }
+        byte type = listTag.get(0).getId();
+        for (int i = 1; i < listTag.size(); i++) {
+            if (listTag.get(i).getId() != type) {
+                return Tag.TAG_END;
+            }
+        }
+        return type;
+    }
+    
     public static ListTag vec3ToListTag(Vec3 vec) {
         ListTag listTag = new ListTag();
         listTag.add(DoubleTag.valueOf(vec.x));
@@ -1464,7 +1481,7 @@ public class Helper {
     
     public static @Nullable Vec3 vec3FromListTag(Tag tag) {
         if (tag instanceof ListTag listTag) {
-            if (listTag.getElementType() == Tag.TAG_DOUBLE && listTag.size() == 3) {
+            if (getListElementType(listTag) == Tag.TAG_DOUBLE && listTag.size() == 3) {
                 return new Vec3(
                     listTag.getDoubleOr(0, 0.0),
                     listTag.getDoubleOr(1, 0.0),

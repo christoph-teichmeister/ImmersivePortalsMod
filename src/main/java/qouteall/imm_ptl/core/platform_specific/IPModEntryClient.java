@@ -3,6 +3,7 @@ package qouteall.imm_ptl.core.platform_specific;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -48,15 +49,17 @@ public class IPModEntryClient implements ClientModInitializer {
             VerticalConnectingPortal.ENTITY_TYPE,
             GeneralBreakablePortal.ENTITY_TYPE
         }).forEach(
+            // 26.x: EntityRenderer got a render state type parameter. The (Object) casts decouple this
+            // registration from the render port of PortalEntityRenderer / LoadingIndicatorRenderer.
             entityType -> EntityRendererRegistry.register(
                 entityType,
-                (EntityRendererProvider) PortalEntityRenderer::new
+                (EntityRendererProvider) ctx -> (EntityRenderer) (Object) new PortalEntityRenderer(ctx)
             )
         );
         
         EntityRendererRegistry.register(
             LoadingIndicatorEntity.entityType,
-            LoadingIndicatorRenderer::new
+            (EntityRendererProvider) ctx -> (EntityRenderer) (Object) new LoadingIndicatorRenderer(ctx)
         );
         
     }

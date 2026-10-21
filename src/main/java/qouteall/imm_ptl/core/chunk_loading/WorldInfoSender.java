@@ -4,11 +4,9 @@ import net.minecraft.util.profiling.Profiler;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
-import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.Validate;
 import qouteall.imm_ptl.core.McHelper;
@@ -52,13 +50,8 @@ public class WorldInfoSender {
         PacketRedirection.sendRedirectedMessage(
             player,
             remoteDimension,
-            new ClientboundSetTimePacket(
-                world.getGameTime(),
-                world.getDayTime(),
-                world.getGameRules().getBoolean(
-                    GameRules.RULE_DAYLIGHT
-                )
-            )
+            // 26.x: day time is a server-wide world clock, sync all clocks like vanilla does on join
+            world.getServer().clockManager().createFullSyncPacket()
         );
         
         /**{@link net.minecraft.client.network.ClientPlayNetworkHandler#onGameStateChange(GameStateChangeS2CPacket)}*/

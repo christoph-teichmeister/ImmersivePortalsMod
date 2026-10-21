@@ -2,7 +2,14 @@ package qouteall.imm_ptl.core.portal;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.resources.ResourceKey;
+import qouteall.imm_ptl.core.CHelper;
+import qouteall.imm_ptl.core.McHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.player.LocalPlayer;
@@ -24,12 +31,15 @@ import qouteall.q_misc_util.my_util.IntBox;
 
 public class LoadingIndicatorEntity extends Entity {
     public static final EntityType<LoadingIndicatorEntity> entityType =
-        FabricEntityTypeBuilder.create(
-            MobCategory.MISC,
-            (EntityType.EntityFactory<LoadingIndicatorEntity>) LoadingIndicatorEntity::new
-        ).dimensions(
-            EntityDimensions.fixed(1, 1)
-        ).fireImmune().trackable(96, 20).build();
+        EntityType.Builder.of(
+            (EntityType.EntityFactory<LoadingIndicatorEntity>) LoadingIndicatorEntity::new,
+            MobCategory.MISC
+        ).sized(1, 1).fireImmune()
+            .clientTrackingRange(96 / 16).updateInterval(20) // was trackable(96, 20)
+            .build(ResourceKey.create(
+                Registries.ENTITY_TYPE,
+                McHelper.newResourceLocation("immersive_portals", "loading_indicator")
+            ));
     
     private static final EntityDataAccessor<Component> TEXT = SynchedEntityData.defineId(
         LoadingIndicatorEntity.class, EntityDataSerializers.COMPONENT
@@ -106,6 +116,12 @@ public class LoadingIndicatorEntity extends Entity {
     }
     
     @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
+        // 26.x made this abstract; the 1.21.1 Entity.hurt default did no damage either
+        return false;
+    }
+    
+    @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(TEXT, Component.literal("Loading..."));
         builder.define(BOX_LOW_POS, BlockPos.ZERO);
@@ -113,12 +129,12 @@ public class LoadingIndicatorEntity extends Entity {
     }
     
     @Override
-    protected void readAdditionalSaveData(CompoundTag tag) {
+    protected void readAdditionalSaveData(ValueInput input) {
     
     }
     
     @Override
-    protected void addAdditionalSaveData(CompoundTag tag) {
+    protected void addAdditionalSaveData(ValueOutput output) {
     
     }
     
@@ -148,9 +164,6 @@ public class LoadingIndicatorEntity extends Entity {
     
     @Environment(EnvType.CLIENT)
     private void showMessageClient() {
-        Gui inGameHud = Minecraft.getInstance().gui;
-        inGameHud.setOverlayMessage(
-            getText(), false
-        );
+        CHelper.setOverlayMessage(getText(), false);
     }
 }

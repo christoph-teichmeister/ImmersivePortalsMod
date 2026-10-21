@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.core.mixin.common;
 
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,7 +20,7 @@ public class MixinLivingEntity {
         }
         if (this_.getLastHurtMob() != null) {
             if (this_.getLastHurtMob().level() != this_.level()) {
-            	this_.setLastHurtByPlayer(null);
+            	this_.setLastHurtByPlayer((Player) null, 0); // same as 1.21.1 setLastHurtByPlayer(null)
             }
         }
     }

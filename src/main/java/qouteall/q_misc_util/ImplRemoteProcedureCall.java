@@ -1,5 +1,6 @@
 package qouteall.q_misc_util;
 
+import qouteall.imm_ptl.core.CHelper;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -73,8 +74,8 @@ public class ImplRemoteProcedureCall {
     
     static {
         serializerMap = ImmutableMap.<Class, BiConsumer<RegistryFriendlyByteBuf, Object>>builder()
-            .put(Identifier.class, (buf, o) -> buf.writeResourceLocation(((Identifier) o)))
-            .put(ResourceKey.class, (buf, o) -> buf.writeResourceLocation(((ResourceKey) o).identifier()))
+            .put(Identifier.class, (buf, o) -> buf.writeIdentifier(((Identifier) o)))
+            .put(ResourceKey.class, (buf, o) -> buf.writeIdentifier(((ResourceKey) o).identifier()))
             .put(BlockPos.class, (buf, o) -> buf.writeBlockPos(((BlockPos) o)))
             .put(Vec3.class, (buf, o) -> {
                 Vec3 vec = (Vec3) o;
@@ -102,17 +103,17 @@ public class ImplRemoteProcedureCall {
             .build();
         
         deserializerMap = ImmutableMap.<Type, Function<RegistryFriendlyByteBuf, Object>>builder()
-            .put(Identifier.class, FriendlyByteBuf::readResourceLocation)
+            .put(Identifier.class, FriendlyByteBuf::readIdentifier)
             .put(
                 new TypeToken<ResourceKey<Level>>() {}.getType(),
                 buf -> ResourceKey.create(
-                    Registries.DIMENSION, buf.readResourceLocation()
+                    Registries.DIMENSION, buf.readIdentifier()
                 )
             )
             .put(
                 new TypeToken<ResourceKey<Biome>>() {}.getType(),
                 buf -> ResourceKey.create(
-                    Registries.BIOME, buf.readResourceLocation()
+                    Registries.BIOME, buf.readIdentifier()
                 )
             )
             .put(BlockPos.class, buf -> buf.readBlockPos())
@@ -315,11 +316,11 @@ public class ImplRemoteProcedureCall {
     }
     
     public static void init() {
-        PayloadTypeRegistry.playC2S().register(
+        PayloadTypeRegistry.serverboundPlay().register(
             C2SRPCPayload.TYPE, C2SRPCPayload.CODEC
         );
         
-        PayloadTypeRegistry.playS2C().register(
+        PayloadTypeRegistry.clientboundPlay().register(
             S2CRPCPayload.TYPE, S2CRPCPayload.CODEC
         );
         
@@ -383,22 +384,22 @@ public class ImplRemoteProcedureCall {
     }
     
     @Environment(EnvType.CLIENT)
-    public static Packet<ServerCommonPacketListener> createC2SPacket(
+    public static Packet<ServerCommonPacketListener> createServerboundPacket(
         String methodPath,
         Object... arguments
     ) {
-        return ClientPlayNetworking.createC2SPacket(
+        return ClientPlayNetworking.createServerboundPacket(
             new C2SRPCPayload(
                 true, methodPath, null, List.of(arguments)
             )
         );
     }
     
-    public static Packet<ClientCommonPacketListener> createS2CPacket(
+    public static Packet<ClientCommonPacketListener> createClientboundPacket(
         String methodPath,
         Object... arguments
     ) {
-        return ServerPlayNetworking.createS2CPacket(
+        return ServerPlayNetworking.createClientboundPacket(
             new S2CRPCPayload(
                 true, methodPath, null, List.of(arguments)
             )
@@ -407,7 +408,7 @@ public class ImplRemoteProcedureCall {
     
     @Environment(EnvType.CLIENT)
     private static void clientTellFailure() {
-        Minecraft.getInstance().gui.getChat().addMessage(Component.literal(
+        CHelper.getChat().addClientSystemMessage(Component.literal(
             "The client failed to process a packet from server. See the log for details."
         ).withStyle(ChatFormatting.RED));
     }

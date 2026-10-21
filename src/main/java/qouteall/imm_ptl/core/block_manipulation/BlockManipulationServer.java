@@ -173,7 +173,7 @@ public class BlockManipulationServer {
             Validate.notNull(world, "missing %s", dimension.identifier());
             
             withRedirect(
-                new Context(world, packet.getHitResult()),
+                new Context(world, hitResultOf(packet)),
                 () -> {
                     doProcessUseItemOn(world, player, packet);
                 }
@@ -218,10 +218,18 @@ public class BlockManipulationServer {
         if (isAttackingAction(action)) {
             player.gameMode.handleBlockBreakAction(
                 blockPos, action, packet.getDirection(),
-                world.getMaxBuildHeight(), packet.getSequence()
+                world.getMaxY(), packet.getSequence()
             );
             player.connection.ackBlockChangesUpTo(packet.getSequence());
         }
+    }
+    
+    private static BlockHitResult hitResultOf(ServerboundUseItemOnPacket packet) {
+        //? if >=26.3 {
+        return packet.hitResult();
+        //?} else {
+        /*return packet.getHitResult();*/
+        //?}
     }
     
     public static boolean isAttackingAction(ServerboundPlayerActionPacket.Action action) {
@@ -237,9 +245,14 @@ public class BlockManipulationServer {
     private static void doProcessUseItemOn(
         ServerLevel world, ServerPlayer player, ServerboundUseItemOnPacket packet
     ) {
-        player.connection.ackBlockChangesUpTo(packet.getSequence());
+        //? if >=26.3 {
+        player.connection.ackBlockChangesUpTo(packet.sequence());
+        InteractionHand hand = packet.hand();
+        //?} else {
+        /*player.connection.ackBlockChangesUpTo(packet.getSequence());
         InteractionHand hand = packet.getHand();
-        BlockHitResult blockHitResult = packet.getHitResult();
+        *///?}
+        BlockHitResult blockHitResult = hitResultOf(packet);
         ResourceKey<Level> dimension = world.dimension();
         
         ItemStack itemStack = player.getItemInHand(hand);
@@ -264,9 +277,19 @@ public class BlockManipulationServer {
                 hand,
                 blockHitResult
             );
-            if (actionResult.shouldSwing()) {
+            //? if >=26.3 {
+            if (actionResult instanceof InteractionResult.Success success && success.shouldSwing()) {
+                player.swingAndResetAttackStrength(
+                    hand, itemStack.getInteractAnimation(),
+                    success.swingSource() != InteractionResult.SwingSource.PREDICTED
+                );
+            }
+            //?} else {
+            /*if (actionResult instanceof InteractionResult.Success success
+                && success.swingSource() == InteractionResult.SwingSource.SERVER) {
                 player.swing(hand, true);
             }
+            *///?}
         }
         
         PacketRedirection.sendRedirectedMessage(
@@ -276,7 +299,7 @@ public class BlockManipulationServer {
         );
         
         BlockPos offseted = blockPos.relative(direction);
-        if (offseted.getY() >= world.getMinY() && offseted.getY() < world.getMaxBuildHeight()) {
+        if (offseted.getY() >= world.getMinY() && offseted.getY() <= world.getMaxY()) {
             PacketRedirection.sendRedirectedMessage(
                 player,
                 dimension,

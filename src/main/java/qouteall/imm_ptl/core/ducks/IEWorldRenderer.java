@@ -2,7 +2,7 @@ package qouteall.imm_ptl.core.ducks;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.ViewArea;
@@ -23,7 +23,7 @@ public interface IEWorldRenderer {
         double cameraZ,
         float partialTick,
         PoseStack matrixStack,
-        MultiBufferSource vertexConsumerProvider
+        SubmitNodeCollector submitNodeCollector // 26.x: was MultiBufferSource (gone in 26.2+); render port decides the implementation
     );
     
     PostChain portal_getTransparencyShader();
