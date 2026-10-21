@@ -1,17 +1,14 @@
 package qouteall.imm_ptl.core.render.renderer;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.renderpearl.backend.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import qouteall.imm_ptl.core.CHelper;
-import qouteall.imm_ptl.core.compat.IPPortingLibCompat;
 import qouteall.imm_ptl.core.ducks.IEMinecraftClient;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.render.FrontClipping;
+import qouteall.imm_ptl.core.render.GpuHelper;
 import qouteall.imm_ptl.core.render.MyRenderHelper;
 import qouteall.imm_ptl.core.render.QueryManager;
 import qouteall.imm_ptl.core.render.SecondaryFrameBuffer;
@@ -47,12 +44,7 @@ public class RendererUsingFrameBuffer extends PortalRenderer {
     public void prepareRendering() {
         secondaryFrameBuffer.prepare();
         
-        GlStateManager._enableDepthTest();
-        
         GL11.glDisable(GL11.GL_STENCIL_TEST);
-    
-        IPPortingLibCompat.setIsStencilEnabled(client.getMainRenderTarget(), false);
-//        ((IEFrameBuffer) client.getMainRenderTarget()).setIsStencilBufferEnabledAndReload(false);
     }
     
     protected void doRenderPortal(
@@ -70,31 +62,22 @@ public class RendererUsingFrameBuffer extends PortalRenderer {
         
         PortalRendering.pushPortalLayer(portal);
         
-        RenderTarget oldFrameBuffer = client.getMainRenderTarget();
+        RenderTarget oldFrameBuffer = GpuHelper.getMainTarget();
         
         ((IEMinecraftClient) client).ip_setFrameBuffer(secondaryFrameBuffer.fb);
-        secondaryFrameBuffer.fb.bindWrite(true);
         
-        GlStateManager._clearColor(1, 0, 1, 1);
-        GlStateManager._clearDepth(1);
-        GlStateManager._clear(
-            GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT,
-            Minecraft.ON_OSX
-        );
+        GpuHelper.clearColorAndDepth(secondaryFrameBuffer.fb, 1, 0, 1, 1);
         GL11.glDisable(GL11.GL_STENCIL_TEST);
         
         renderPortalContent(portal);
         
         ((IEMinecraftClient) client).ip_setFrameBuffer(oldFrameBuffer);
-        oldFrameBuffer.bindWrite(true);
         
         PortalRendering.popPortalLayer();
         
         CHelper.enableDepthClamp();
         renderSecondBufferIntoMainBuffer(portal, modelView);
         CHelper.disableDepthClamp();
-        
-        MyRenderHelper.debugFramebufferDepth();
     }
     
     @Override
@@ -116,7 +99,6 @@ public class RendererUsingFrameBuffer extends PortalRenderer {
             ViewAreaRenderer.renderPortalArea(
                 portal, Vec3.ZERO,
                 modelView,
-                RenderSystem.getProjectionMatrix(),
                 true, true,
                 true, true
             );
@@ -127,8 +109,7 @@ public class RendererUsingFrameBuffer extends PortalRenderer {
         MyRenderHelper.drawPortalAreaWithFramebuffer(
             portal,
             secondaryFrameBuffer.fb,
-            modelView,
-            RenderSystem.getProjectionMatrix()
+            modelView
         );
     }
     

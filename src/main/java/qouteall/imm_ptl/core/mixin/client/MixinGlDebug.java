@@ -1,6 +1,10 @@
 package qouteall.imm_ptl.core.mixin.client;
 
+//? if >=26.3 {
 import com.mojang.renderpearl.backend.opengl.GlDebug;
+//?} else {
+/*import com.mojang.blaze3d.opengl.GlDebug;
+*///?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -10,11 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GlDebug.class)
 public class MixinGlDebug {
     private static int loggedNum = 0;
-    
+
     @Inject(
-        method = "Lcom/mojang/blaze3d/platform/GlDebug;printDebugLog(IIIIIJJ)V", at = @At("RETURN")
+        method = "printDebugLog(IIIIIJJ)V", at = @At("RETURN")
     )
-    private static void onLogging(
+    private void onLogging(
         int source, int type, int id, int severity, int messageLength, long message, long l,
         CallbackInfo ci
     ) {

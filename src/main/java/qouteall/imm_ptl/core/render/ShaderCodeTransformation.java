@@ -1,6 +1,5 @@
 package qouteall.imm_ptl.core.render;
 
-import com.mojang.blaze3d.shaders.Program;
 import com.mojang.logging.LogUtils;
 import me.shedaniel.cloth.clothconfig.shadowed.org.yaml.snakeyaml.Yaml;
 import org.jetbrains.annotations.Nullable;
@@ -12,6 +11,11 @@ import qouteall.q_misc_util.Helper;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * GLSL source transformation that injects the clip plane into shaders (configured in shader_transformation.yaml).
+ * TODO port: not hooked into the 26.x shader loading (ShaderManager / pipeline compilation, SPIR-V in 26.3).
+ *  The portal clipping uses an oblique projection instead, see FrontClipping.
+ */
 public class ShaderCodeTransformation {
     private static final Logger LOGGER = LogUtils.getLogger();
     
@@ -19,14 +23,8 @@ public class ShaderCodeTransformation {
         vs, fs
     }
     
-    private static boolean matches(ShaderType me, Program.Type type) {
-        if (type == Program.Type.FRAGMENT) {
-            return me == ShaderType.fs;
-        }
-        else if (type == Program.Type.VERTEX) {
-            return me == ShaderType.vs;
-        }
-        return false;
+    private static boolean matches(ShaderType me, ShaderType type) {
+        return me == type;
     }
     
     // snakeyaml does not allow passing generic type
@@ -69,7 +67,7 @@ public class ShaderCodeTransformation {
         }
     }
     
-    public static String transform(Program.Type type, String shaderId, String inputCode) {
+    public static String transform(ShaderType type, String shaderId, String inputCode) {
         if (configs == null) {
             LOGGER.info("Shader Transform Skipping {}", shaderId);
             return inputCode;
@@ -96,7 +94,7 @@ public class ShaderCodeTransformation {
     }
     
     @Nullable
-    private static Config getConfig(Program.Type type, String shaderId) {
+    private static Config getConfig(ShaderType type, String shaderId) {
         return configs.stream().filter(
             config -> matches(config.type, type) &&
                 config.affectedShaders.contains(shaderId)

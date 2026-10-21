@@ -40,8 +40,9 @@ public class MixinFrustum implements IEFrustum {
     private FrustumCuller portal_frustumCuller;
     
     // copy the extra fields when copying frustum
+    // (26.x: the copy constructor delegates to set(Frustum))
     @Inject(
-        method = "<init>(Lnet/minecraft/client/renderer/culling/Frustum;)V",
+        method = "set(Lnet/minecraft/client/renderer/culling/Frustum;)V",
         at = @At("RETURN")
     )
     private void onFrustumCopy(Frustum other, CallbackInfo ci) {
@@ -55,7 +56,7 @@ public class MixinFrustum implements IEFrustum {
     }
     
     @Inject(
-        method = "Lnet/minecraft/client/renderer/culling/Frustum;prepare(DDD)V",
+        method = "prepare(DDD)V",
         at = @At("TAIL")
     )
     private void onSetOrigin(double double_1, double double_2, double double_3, CallbackInfo ci) {
@@ -73,14 +74,15 @@ public class MixinFrustum implements IEFrustum {
         portal_camZ = camZ;
     }
     
+    // 26.x: cubeInFrustum returns the FrustumIntersection result, a plane index (>= 0) means outside
     @Inject(
-        method = "cubeInFrustum",
+        method = "cubeInFrustum(DDDDDD)I",
         at = @At("HEAD"),
         cancellable = true
     )
     private void onCubeInFrustum(
         double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
-        CallbackInfoReturnable<Boolean> cir
+        CallbackInfoReturnable<Integer> cir
     ) {
         if (ip_canDetermineInvisibleWithCamCoord(
             (float) (minX - portal_camX),
@@ -90,7 +92,7 @@ public class MixinFrustum implements IEFrustum {
             (float) (maxY - portal_camY),
             (float) (maxZ - portal_camZ)
         )) {
-            cir.setReturnValue(false);
+            cir.setReturnValue(0);
         }
     }
     
@@ -100,7 +102,7 @@ public class MixinFrustum implements IEFrustum {
         at = @At("RETURN")
     )
     private void onCalculateFrustumReturn(
-        Matrix4f matrix4f, Matrix4f matrix4f2, CallbackInfo ci
+        org.joml.Matrix4fc modelView, Matrix4f projection, CallbackInfo ci
     ) {
         viewVector.normalize();
     }
@@ -109,6 +111,10 @@ public class MixinFrustum implements IEFrustum {
     public boolean ip_canDetermineInvisibleWithCamCoord(
         float minX, float minY, float minZ, float maxX, float maxY, float maxZ
     ) {
+        if (portal_frustumCuller == null) {
+            // 26.x creates frustums that are never prepared (e.g. the default in CameraRenderState)
+            return false;
+        }
         return portal_frustumCuller.canDetermineInvisibleWithCameraCoord(
             minX, minY, minZ, maxX, maxY, maxZ
         );
