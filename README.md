@@ -27,6 +27,19 @@ This mod also provides some API for:
 ## How to run this code
 https://fabricmc.net/wiki/tutorial:setup
 
+## Development
+
+Java 25 (`export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64`), one Gradle project per Minecraft version (`26.1.2`, `26.2`, `26.3`), shared run directory `run/`:
+
+```bash
+./gradlew :26.3:runServer -PmixinAudit                        # console commands go to stdin
+./gradlew :26.3:runClient -PmixinAudit -PquickPlay=<world>    # opens run/saves/<world> directly
+```
+
+- `-PmixinAudit` adds `-Dmixin.debug.verify=true -Dimm_ptl.mixin_audit=true`; the mod then calls `MixinEnvironment.audit()` once the server or client has started, which force-loads every mixin target (Fabric Loader 0.20 has no switch for that).
+- On a first launch the iPortal intro screen comes before quick play, unless `"initialScreenShown": true` is set in `run/config/immersive_portals.json`.
+- Portals are only rendered on the OpenGL backend. On Wayland with NVIDIA, 26.3 fails to create the OpenGL context and falls back to Vulkan; start the client with `env -u WAYLAND_DISPLAY SDL_VIDEODRIVER=x11 ./gradlew ...` there.
+
 ## Other
 
 [Wiki](https://qouteall.fun/immptl/wiki/)
