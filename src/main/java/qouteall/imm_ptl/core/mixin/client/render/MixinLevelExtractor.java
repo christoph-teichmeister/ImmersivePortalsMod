@@ -84,6 +84,22 @@ public abstract class MixinLevelExtractor {
         original.call(tracker, pos);
     }
 
+    /**
+     * The chunk loading events of the player's dimension are consumed by the outer view's occlusion graph,
+     * do not consume them in a portal view (the graph update is skipped there, see MixinLevelRenderer).
+     */
+    @WrapWithCondition(
+        method = "extract",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/multiplayer/ClientChunkCache;flipUpdateTrackingSets()V"
+        )
+    )
+    private boolean shouldFlipChunkTracking(net.minecraft.client.multiplayer.ClientChunkCache instance) {
+        return !(WorldRenderInfo.isRendering() && level != null &&
+            level.dimension() == RenderStates.originalPlayerDimension);
+    }
+    
     private boolean ip_allowOverrideTerrainSetup() {
         return !SodiumInterface.invoker.isSodiumPresent()
             && !IrisInterface.invoker.isRenderingShadowMap()

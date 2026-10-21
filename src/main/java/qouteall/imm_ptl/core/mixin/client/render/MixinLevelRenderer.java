@@ -310,6 +310,30 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
     }
 
     /**
+     * The vanilla occlusion graph of the player's dimension serves the outer view.
+     * Updating it from a portal camera (mirrors, same-dimension portals) would rebuild it every frame.
+     */
+    @com.llamalad7.mixinextras.injector.WrapWithCondition(
+        method = "render",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/SectionOcclusionGraph;update(Lnet/minecraft/client/renderer/state/level/CameraRenderState;ILnet/minecraft/client/renderer/state/level/ChunkLoadingRenderState;)V"
+        )
+    )
+    private boolean shouldUpdateOcclusionGraph(
+        SectionOcclusionGraph instance, CameraRenderState camera, int fov,
+        net.minecraft.client.renderer.state.level.ChunkLoadingRenderState chunkLoading
+    ) {
+        return !ip_isRenderingPortalOfPlayerDimension();
+    }
+    
+    private static boolean ip_isRenderingPortalOfPlayerDimension() {
+        Minecraft client = Minecraft.getInstance();
+        return WorldRenderInfo.isRendering() && client.level != null &&
+            client.level.dimension() == qouteall.imm_ptl.core.render.context_management.RenderStates.originalPlayerDimension;
+    }
+    
+    /**
      * The view area and the section dispatcher follow the outer camera.
      * (In 1.21.1 the portal rendering did not reposition the view area either.)
      */
@@ -320,7 +344,8 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
     )
     private void onRepositionCamera(CameraRenderState camera, CallbackInfo ci) {
         if (WorldRenderInfo.isRendering()) {
-            if (sectionRenderDispatcher != null) {
+            // the camera position is used for translucent sort, keep the outer one in the player's dimension
+            if (sectionRenderDispatcher != null && !ip_isRenderingPortalOfPlayerDimension()) {
                 sectionRenderDispatcher.setCameraPosition(camera.pos);
             }
             ci.cancel();

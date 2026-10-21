@@ -14,6 +14,8 @@ import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.fog.FogRenderer;
 import net.minecraft.client.renderer.state.GameRenderState;
@@ -223,6 +225,10 @@ public class MyGameRenderer {
         SubmitNodeStorage oldSubmitNodeStorage = levelRendererAccess.ip_getSubmitNodeStorage();
         FeatureRenderDispatcher oldFeatureRenderDispatcher = levelRendererAccess.ip_getFeatureRenderDispatcher();
         RenderBuffers oldRenderBuffers = levelRendererAccess.ip_getRenderBuffers();
+        ObjectArrayList<SectionRenderDispatcher.RenderSection> oldVisibleSections =
+            levelRendererAccess.ip_getVisibleSections();
+        ObjectArrayList<SectionRenderDispatcher.RenderSection> oldNearbyVisibleSections =
+            levelRendererAccess.ip_getNearbyVisibleSections();
         GpuBufferSlice oldProjection = RenderSystem.getProjectionMatrixBuffer();
         ProjectionType oldProjectionType = RenderSystem.getProjectionType();
         GpuBufferSlice oldFog = RenderSystem.getShaderFog();
@@ -251,6 +257,11 @@ public class MyGameRenderer {
         levelRendererAccess.ip_setSubmitNodeStorage(context.submitNodeStorage);
         levelRendererAccess.ip_setFeatureRenderDispatcher(context.featureRenderDispatcher);
         levelRendererAccess.ip_setRenderBuffers(context.renderBuffers);
+        // the outer rendering of the same level renderer (mirrors) keeps its visible sections
+        ObjectArrayList<SectionRenderDispatcher.RenderSection> newVisibleSections = VisibleSectionDiscovery.takeList();
+        ObjectArrayList<SectionRenderDispatcher.RenderSection> newNearbyVisibleSections = VisibleSectionDiscovery.takeList();
+        levelRendererAccess.ip_setVisibleSections(newVisibleSections);
+        levelRendererAccess.ip_setNearbyVisibleSections(newNearbyVisibleSections);
         //? if >=26.2 {
         ((qouteall.imm_ptl.core.mixin.client.accessor.IEMinecraft_Accessor) client).ip_setLevelExtractor(newExtractor);
         ((qouteall.imm_ptl.core.mixin.client.render.IELevelExtractor_Accessor) newExtractor)
@@ -301,6 +312,10 @@ public class MyGameRenderer {
             levelRendererAccess.ip_setSubmitNodeStorage(oldSubmitNodeStorage);
             levelRendererAccess.ip_setFeatureRenderDispatcher(oldFeatureRenderDispatcher);
             levelRendererAccess.ip_setRenderBuffers(oldRenderBuffers);
+            levelRendererAccess.ip_setVisibleSections(oldVisibleSections);
+            levelRendererAccess.ip_setNearbyVisibleSections(oldNearbyVisibleSections);
+            VisibleSectionDiscovery.returnList(newVisibleSections);
+            VisibleSectionDiscovery.returnList(newNearbyVisibleSections);
             //? if >=26.2 {
             ((qouteall.imm_ptl.core.mixin.client.render.IELevelExtractor_Accessor) newExtractor)
                 .ip_setLevelRenderState(oldExtractorLevelRenderState);

@@ -1,6 +1,8 @@
 package qouteall.imm_ptl.core.mixin.client.render;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
@@ -41,4 +43,18 @@ public interface IELevelRenderer_Accessor {
     @Mutable
     @Accessor("renderBuffers")
     void ip_setRenderBuffers(RenderBuffers arg);
+    
+    @Accessor("visibleSections")
+    ObjectArrayList<SectionRenderDispatcher.RenderSection> ip_getVisibleSections();
+    
+    @Mutable
+    @Accessor("visibleSections")
+    void ip_setVisibleSections(ObjectArrayList<SectionRenderDispatcher.RenderSection> arg);
+    
+    @Accessor("nearbyVisibleSections")
+    ObjectArrayList<SectionRenderDispatcher.RenderSection> ip_getNearbyVisibleSections();
+    
+    @Mutable
+    @Accessor("nearbyVisibleSections")
+    void ip_setNearbyVisibleSections(ObjectArrayList<SectionRenderDispatcher.RenderSection> arg);
 }
