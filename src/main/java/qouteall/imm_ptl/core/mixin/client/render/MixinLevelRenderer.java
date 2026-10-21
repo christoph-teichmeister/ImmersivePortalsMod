@@ -105,6 +105,9 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
     @Shadow
     @Final
     private net.minecraft.client.renderer.GameRenderer gameRenderer;
+    
+    @Shadow
+    protected abstract void prepareTranslucents();
 
     @Nullable
     private ChunkSectionsToRender ip_deferredTranslucentSections;
@@ -149,14 +152,19 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
         )
     )
     private void ip_onAfterSolidPass(CallbackInfo ci) {
-        IPCGlobal.renderer.onBeforeTranslucentRendering(ip_getCurrentModelView());
-
+        // read the deferred state before rendering the portals,
+        // a portal view of the same level renderer (mirror) sets and consumes these fields too
         ChunkSectionsToRender sections = ip_deferredTranslucentSections;
         FeatureRenderDispatcher.PreparedFrame frame = ip_deferredTranslucentFrame;
         ip_deferredTranslucentSections = null;
         ip_deferredTranslucentFrame = null;
-
+        
+        IPCGlobal.renderer.onBeforeTranslucentRendering(ip_getCurrentModelView());
+        
         if (sections != null && frame != null) {
+            // a portal view of the same level renderer prepared the clouds, weather and world border for its camera
+            prepareTranslucents();
+            
             RenderTarget mainTarget = gameRenderer.mainRenderTarget();
             try (RenderPass renderPass = RenderSystem.getDevice()
                 .createCommandEncoder()
