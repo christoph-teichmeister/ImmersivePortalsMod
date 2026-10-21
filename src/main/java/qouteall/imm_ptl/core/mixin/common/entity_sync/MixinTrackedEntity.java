@@ -251,7 +251,7 @@ public abstract class MixinTrackedEntity implements IETrackedEntity {
         
         Packet spawnPacket = entity.getAddEntityPacket(serverEntity);
         Packet<ClientGamePacketListener> redirected = PacketRedirection.createRedirectedMessage(
-            entity.getServer(),
+            entity.level().getServer(),
             entity.level().dimension(), spawnPacket
         );
         seenBy.forEach(handler -> {

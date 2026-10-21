@@ -177,7 +177,7 @@ public class IPMcHelper {
      * @return Whatever {@code func} returned.
      */
     public static <T> T withSwitchedContext(Level world, Supplier<T> func) {
-        if (world.isClientSide) {
+        if (world.isClientSide()) {
             return ClientWorldLoader.withSwitchedWorld((ClientLevel) world, func);
         }
         else {
@@ -205,7 +205,7 @@ public class IPMcHelper {
             return new Tuple<>(
                 BlockHitResult.miss(
                     end,
-                    Direction.getNearest(diff.x, diff.y, diff.z),
+                    Direction.getApproximateNearest(diff.x, diff.y, diff.z),
                     BlockPos.containing(end)
                 ),
                 portals

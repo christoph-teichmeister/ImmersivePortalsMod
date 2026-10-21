@@ -187,8 +187,8 @@ public class ClientWorldLoader {
             Vec3 playerPos = CLIENT.player.position();
             Vec3 center = portal.transformPoint(playerPos);
             
-            Camera camera = CLIENT.gameRenderer.getMainCamera();
-            Vec3 oldCameraPos = camera.getPosition();
+            Camera camera = CHelper.getMainCamera();
+            Vec3 oldCameraPos = camera.position();
             
             ((IECamera) camera).portal_setPos(center);
             

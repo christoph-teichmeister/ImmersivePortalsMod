@@ -371,7 +371,7 @@ public class ClientTeleportationManager {
         
         ScaleUtils.onClientPlayerTeleported(portal);
         
-        player.connection.send(ClientPlayNetworking.createC2SPacket(
+        player.connection.send(ClientPlayNetworking.createServerboundPacket(
             new ImmPtlNetworking.TeleportPacket(
                 PortalAPI.clientDimKeyToInt(fromDimension),
                 thisTickEyePos,
@@ -498,7 +498,7 @@ public class ClientTeleportationManager {
             ((IEParticleManager) client.particleEngine).ip_setWorld(toWorld);
         }
         
-        client.getBlockEntityRenderDispatcher().setLevel(toWorld);
+        // 26.x: BlockEntityRenderDispatcher no longer holds a level (1.21.1 called setLevel(toWorld) here)
         
         if (vehicle != null) {
             Vec3 offset = McHelper.getVehicleOffsetFromPassenger(vehicle, player);
@@ -512,7 +512,7 @@ public class ClientTeleportationManager {
                 player.position().add(offset),
                 McHelper.lastTickPosOf(player).add(offset)
             );
-            player.startRiding(vehicle, true);
+            player.startRiding(vehicle, true, true);
         }
         
         Helper.log(String.format(
@@ -712,11 +712,7 @@ public class ClientTeleportationManager {
             
             // both of them are important for Minecart
             entity.setPos(pos);
-            entity.lerpTo(
-                pos.x, pos.y, pos.z,
-                entity.getYRot(), entity.getXRot(),
-                0
-            );
+            McHelper.cancelInterpolation(entity); // was lerpTo(..., 0)
             entity.setPos(pos);
         }
     }

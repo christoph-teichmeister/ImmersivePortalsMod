@@ -81,7 +81,7 @@ public class ExampleGuiPortalRendering {
         
         ChunkLoader chunkLoader = new ChunkLoader(
             new DimensionalChunkPos(
-                world.dimension(), new ChunkPos(BlockPos.containing(pos))
+                world.dimension(), ChunkPos.containing(BlockPos.containing(pos))
             ),
             8
         );
@@ -112,7 +112,7 @@ public class ExampleGuiPortalRendering {
                 frameBuffer = new TextureTarget(2, 2, true, true);
             }
             
-            Minecraft.getInstance().setScreen(new GuiPortalScreen(dimension, position));
+            CHelper.setScreen(new GuiPortalScreen(dimension, position));
         }
         
         public static void serverRemoveChunkLoader(ServerPlayer player) {

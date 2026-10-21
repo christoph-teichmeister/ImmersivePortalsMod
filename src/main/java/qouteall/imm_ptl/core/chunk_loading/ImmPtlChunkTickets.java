@@ -5,18 +5,18 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongPredicate;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.TicketStorage;
+import qouteall.imm_ptl.core.McHelper;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
-import net.minecraft.server.level.ChunkTaskPriorityQueue;
-import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
-import net.minecraft.util.SortedArraySet;
-import net.minecraft.util.thread.ProcessorMailbox;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.apache.commons.lang3.Validate;
@@ -32,7 +32,6 @@ import qouteall.q_misc_util.Helper;
 import qouteall.q_misc_util.my_util.RateStat;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
@@ -46,9 +45,10 @@ import java.util.concurrent.Executor;
  * The throttling will reduce the world generation and chunk loading workload when the player moves fast,
  * and prioritize the chunks near player.
  * <p>
- * In vanilla, it uses {@link ChunkTaskPriorityQueue} that has 4 slots of "acquired" chunk positions.
+ * In vanilla (1.21.1), it uses ChunkTaskPriorityQueue that has 4 slots of "acquired" chunk positions.
  * If the acquired chunk slots are full, it will stop processing task, until a slot releases.
- * The {@link ChunkTaskPriorityQueueSorter} uses a {@link ProcessorMailbox}
+ * The ChunkTaskPriorityQueueSorter uses a ProcessorMailbox
+ * (26.x: ThrottlingChunkTaskDispatcher)
  * (the mailbox is similar to a one-thread thread pool but uses threads from the worker thread pool)
  * to do a lot of message-passing (it enqueues at least 5 messages just to add one ticket).
  * In {@link DistanceManager.PlayerTicketTracker} it sends message for acquiring and releasing.
@@ -59,8 +59,13 @@ import java.util.concurrent.Executor;
 public class ImmPtlChunkTickets {
     private static final Logger LOGGER = LogUtils.getLogger();
     
-    public static final TicketType<ChunkPos> TICKET_TYPE =
-        TicketType.create("imm_ptl", Comparator.comparingLong(ChunkPos::toLong));
+    // 26.x: ticket types are registry entries without a value type.
+    // FLAG_LOADING only: like the 1.21.1 region ticket (forceTicks = false) it loads but does not simulate.
+    public static final TicketType TICKET_TYPE = Registry.register(
+        BuiltInRegistries.TICKET_TYPE,
+        McHelper.newResourceLocation("immersive_portals", "imm_ptl"),
+        new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING)
+    );
     
     // for debugging
     @SuppressWarnings("FieldMayBeFinal")
@@ -183,9 +188,6 @@ public class ImmPtlChunkTickets {
             return;
         }
         
-        DistanceManager distanceManager = getDistanceManager(world);
-        Executor mainThreadExecutor = ((qouteall.imm_ptl.core.mixin.common.chunk_sync.IEDistanceManager) distanceManager).ip_getMainThreadExecutor();
-        
         // clear the already loaded chunks
         waitingForLoading.removeIf((long chunkPos) -> {
             ChunkHolder chunkHolder = getChunkHolder(world, chunkPos);
@@ -203,7 +205,7 @@ public class ImmPtlChunkTickets {
             if (!resultNow.isSuccess()) {
                 LOGGER.error(
                     "Chunk loading failure {} {} {}",
-                    world, new ChunkPos(chunkPos)
+                    world, ChunkPos.unpack(chunkPos)
                 );
             }
             
@@ -220,26 +222,26 @@ public class ImmPtlChunkTickets {
                     
                     long chunkPos = queue.removeFirstLong();
                     if (chunkPosToTicketInfo.containsKey(chunkPos)) {
-                        addTicket(distanceManager, chunkPos);
+                        addTicket(world, chunkPos);
                         
                         waitingForLoading.add(chunkPos);
                     }
                     else {
-                        LOGGER.warn("Chunk {} is not in the queue", new ChunkPos(chunkPos));
+                        LOGGER.warn("Chunk {} is not in the queue", ChunkPos.unpack(chunkPos));
                     }
                 }
             }
         }
     }
     
-    private static void addTicket(DistanceManager distanceManager, long chunkPos) {
+    private static void addTicket(ServerLevel world, long chunkPos) {
         if (!IPConfig.getConfig().enableImmPtlChunkLoading) {
             return;
         }
         
-        ChunkPos chunkPosObj = new ChunkPos(chunkPos);
-        distanceManager.addRegionTicket(
-            TICKET_TYPE, chunkPosObj, getLoadingRadius(), chunkPosObj
+        ChunkPos chunkPosObj = ChunkPos.unpack(chunkPos);
+        world.getChunkSource().addTicketWithRadius(
+            TICKET_TYPE, chunkPosObj, getLoadingRadius()
         );
         
         if (enableDebugRateStat) {
@@ -251,8 +253,6 @@ public class ImmPtlChunkTickets {
         ServerLevel world,
         LongPredicate shouldKeepLoadingFunc
     ) {
-        DistanceManager distanceManager = getDistanceManager(world);
-        
         chunkPosToTicketInfo.long2ObjectEntrySet().removeIf(e -> {
             long chunkPos = e.getLongKey();
             ChunkTicketInfo ticketInfo = e.getValue();
@@ -266,9 +266,9 @@ public class ImmPtlChunkTickets {
                     .remove(chunkPos);
                 
                 if (!pendingTicketAdding) {
-                    ChunkPos chunkPosObj = new ChunkPos(chunkPos);
-                    distanceManager.removeRegionTicket(
-                        TICKET_TYPE, chunkPosObj, getLoadingRadius(), chunkPosObj
+                    ChunkPos chunkPosObj = ChunkPos.unpack(chunkPos);
+                    world.getChunkSource().removeTicketWithRadius(
+                        TICKET_TYPE, chunkPosObj, getLoadingRadius()
                     );
                 }
                 return true;
@@ -294,19 +294,16 @@ public class ImmPtlChunkTickets {
     }
     
     private static void removeAllTicketsInWorld(ServerLevel world, ImmPtlChunkTickets dimTicketManager) {
-        DistanceManager ticketManager = getDistanceManager(world);
+        TicketStorage ticketStorage = ((IEDistanceManager) getDistanceManager(world))
+            .ip_getTicketStorage();
         
         dimTicketManager.chunkPosToTicketInfo.keySet().forEach((long pos) -> {
-            SortedArraySet<Ticket<?>> tickets = ((IEDistanceManager) getDistanceManager(world))
-                .portal_getTicketSet(pos);
-            
-            // avoid removing ticket when iterating the ticket set
-            List<Ticket<?>> toRemove = tickets.stream()
+            // avoid removing ticket when iterating the ticket list
+            List<Ticket> toRemove = ticketStorage.getTickets(pos).stream()
                 .filter(t -> t.getType() == TICKET_TYPE).toList();
             
-            ChunkPos chunkPos = new ChunkPos(pos);
-            for (Ticket<?> ticket : toRemove) {
-                ticketManager.removeRegionTicket(TICKET_TYPE, chunkPos, ticket.getTicketLevel(), chunkPos);
+            for (Ticket ticket : toRemove) {
+                ticketStorage.removeTicket(pos, ticket);
             }
         });
         

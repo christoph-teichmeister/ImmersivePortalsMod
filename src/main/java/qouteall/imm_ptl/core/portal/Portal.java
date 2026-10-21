@@ -5,7 +5,10 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -84,27 +87,34 @@ public class Portal extends Entity implements
     PortalLike, IPEntityEventListenableEntity {
     private static final Logger LOGGER = LogUtils.getLogger();
     
-    public static final EntityType<Portal> ENTITY_TYPE = createPortalEntityType(Portal::new);
+    public static final EntityType<Portal> ENTITY_TYPE = createPortalEntityType("portal", Portal::new);
     
     public static final Event<Consumer<Portal>> CLIENT_PORTAL_ACCEPT_SYNC_EVENT =
         Helper.createConsumerEvent();
     public static final Event<Consumer<Portal>> CLIENT_PORTAL_SPAWN_EVENT =
         Helper.createConsumerEvent();
     
+    /**
+     * 26.x: EntityType.Builder.build needs the registry key up front,
+     * so the path (namespace immersive_portals) must match the registration in IPModMain.
+     */
     public static <T extends Portal> EntityType<T> createPortalEntityType(
-        EntityType.EntityFactory<T> constructor
+        String idPath, EntityType.EntityFactory<T> constructor
     ) {
-        return FabricEntityTypeBuilder.create(
-                MobCategory.MISC,
-                constructor
-            ).dimensions(
-                // eye height should be 0
-                EntityDimensions.fixed(0, 0)
-            ).fireImmune()
-            .trackRangeBlocks(96)
-            .trackedUpdateRate(20)
-            .forceTrackedVelocityUpdates(true)
-            .build();
+        return EntityType.Builder.of(
+                constructor,
+                MobCategory.MISC
+            )
+            // eye height should be 0
+            .sized(0, 0)
+            .eyeHeight(0)
+            .fireImmune()
+            .clientTrackingRange(96 / 16) // was trackRangeBlocks(96)
+            .updateInterval(20)
+            .alwaysUpdateVelocity(true) // was forceTrackedVelocityUpdates(true)
+            .build(ResourceKey.create(
+                Registries.ENTITY_TYPE, McHelper.newResourceLocation("immersive_portals", idPath)
+            ));
     }
     
     private static final AABB NULL_BOX =
@@ -225,11 +235,32 @@ public class Portal extends Entity implements
     }
     
     @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
+        // 26.x made this abstract; the 1.21.1 Entity.hurt default did no damage either
+        return false;
+    }
+    
+    @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         // nothing
     }
     
     @Override
+    protected void readAdditionalSaveData(ValueInput input) {
+        readAdditionalSaveData(McHelper.readWholeCompound(input));
+    }
+    
+    @Override
+    protected void addAdditionalSaveData(ValueOutput output) {
+        CompoundTag tag = new CompoundTag();
+        addAdditionalSaveData(tag);
+        McHelper.writeWholeCompound(output, tag);
+    }
+    
+    /**
+     * Portal data is still handled as a CompoundTag (same layout as 1.21.1).
+     * Subclasses override this and {@link #addAdditionalSaveData(CompoundTag)}.
+     */
     protected void readAdditionalSaveData(CompoundTag compoundTag) {
         width = compoundTag.getDoubleOr("width", 0.0);
         height = compoundTag.getDoubleOr("height", 0.0);
@@ -292,7 +323,7 @@ public class Portal extends Entity implements
                 compoundTag.getFloatOr("rotationB", 0f),
                 compoundTag.getFloatOr("rotationC", 0f),
                 compoundTag.getFloatOr("rotationD", 0f),
-                compoundTag.getFloat("rotationA")
+                compoundTag.getFloatOr("rotationA", 0f)
             ));
         }
         else {
@@ -335,7 +366,7 @@ public class Portal extends Entity implements
         if (compoundTag.contains("commandsOnTeleported")) {
             ListTag list = compoundTag.getListOrEmpty("commandsOnTeleported");
             commandsOnTeleported = list.stream()
-                .map(t -> ((StringTag) t).getAsString()).collect(Collectors.toList());
+                .map(t -> ((StringTag) t).value()).collect(Collectors.toList());
         }
         else {
             commandsOnTeleported = null;
@@ -362,7 +393,6 @@ public class Portal extends Entity implements
         updateCache();
     }
     
-    @Override
     protected void addAdditionalSaveData(CompoundTag compoundTag) {
         compoundTag.putDouble("width", width);
         compoundTag.putDouble("height", height);
@@ -539,7 +569,7 @@ public class Portal extends Entity implements
     
     public void reloadAndSyncToClientWithTickDelay(int tickDelay) {
         Validate.isTrue(!level().isClientSide(), "must be used on server side");
-        ServerTaskList.of(getServer()).addTask(MyTaskList.withDelay(tickDelay, () -> {
+        ServerTaskList.of(level().getServer()).addTask(MyTaskList.withDelay(tickDelay, () -> {
             reloadAndSyncToClientNextTick();
             return true;
         }));
@@ -910,9 +940,9 @@ public class Portal extends Entity implements
         
         // the listener generic parameter is contravariant. this is fine
         return (Packet<ClientGamePacketListener>) (Packet)
-            ServerPlayNetworking.createS2CPacket(new ImmPtlNetworking.PortalSyncPacket(
+            ServerPlayNetworking.createClientboundPacket(new ImmPtlNetworking.PortalSyncPacket(
                 getId(), getUUID(), getType(),
-                PortalAPI.serverDimKeyToInt(getServer(), getOriginDim()),
+                PortalAPI.serverDimKeyToInt(level().getServer(), getOriginDim()),
                 getX(), getY(), getZ(),
                 compoundTag
             ));
@@ -958,7 +988,8 @@ public class Portal extends Entity implements
     }
     
     @Override
-    protected @NotNull AABB makeBoundingBox() {
+    protected @NotNull AABB makeBoundingBox(Vec3 position) {
+        // the portal box is determined by the portal state, not by the given position
         if (axisW == null) {
             // it may be called when the portal is not yet initialized
             boundingBoxCache = null;
@@ -1054,7 +1085,7 @@ public class Portal extends Entity implements
     }
     
     public Direction getApproximateFacingDirection() {
-        return Direction.getNearest(
+        return Direction.getApproximateNearest(
             getNormal().x, getNormal().y, getNormal().z
         );
     }
@@ -1308,7 +1339,7 @@ public class Portal extends Entity implements
             return CHelper.getClientWorld(dimensionTo);
         }
         else {
-            MinecraftServer server = getServer();
+            MinecraftServer server = level().getServer();
             assert server != null;
             return server.getLevel(dimensionTo);
         }
@@ -1657,7 +1688,7 @@ public class Portal extends Entity implements
         
         Vec3 newGravityVec = transformLocalVecNonScale(oldGravityVec);
         
-        return Direction.getNearest(
+        return Direction.getApproximateNearest(
             newGravityVec.x, newGravityVec.y, newGravityVec.z
         );
     }
@@ -1769,7 +1800,7 @@ public class Portal extends Entity implements
     public void updatePortalFromNbt(CompoundTag newNbt) {
         CompoundTag data = writePortalDataToNbt();
         
-        newNbt.getAllKeys().forEach(
+        newNbt.keySet().forEach(
             key -> data.put(key, newNbt.get(key))
         );
         
@@ -1865,7 +1896,7 @@ public class Portal extends Entity implements
         
         return McHelper.isServerChunkFullyLoaded(
             (ServerLevel) getDestWorld(),
-            new ChunkPos(BlockPos.containing(getDestPos()))
+            ChunkPos.containing(BlockPos.containing(getDestPos()))
         );
     }
     

@@ -202,7 +202,7 @@ public class CustomPortalGeneration {
         @Override
         public String toString() {
             return "No source dimension is loaded %s"
-                .formatted(srcDimIds.stream().map(ResourceKey::location).collect(Collectors.toList()));
+                .formatted(srcDimIds.stream().map(ResourceKey::identifier).collect(Collectors.toList()));
         }
     }
     

@@ -37,7 +37,7 @@ public record FastBlockAccess(
         int radiusChunks
     ) {
         int lowerCX = centerChunkPos.x() - radiusChunks;
-        int lowerCY = world.getMinSection();
+        int lowerCY = world.getMinSectionY();
         int lowerCZ = centerChunkPos.z() - radiusChunks;
         int upperCX = centerChunkPos.x() + radiusChunks;
         int upperCY = world.getMaxSection();
@@ -60,7 +60,7 @@ public record FastBlockAccess(
         int lY = upperCYExclusive - lowerCY;
         int lZ = upperCZExclusive - lowerCZ;
         
-        int minSectionY = world.getMinSection();
+        int minSectionY = world.getMinSectionY();
         int maxSectionYExclusive = world.getMaxSection();
         Validate.isTrue(
             lowerCY >= minSectionY,

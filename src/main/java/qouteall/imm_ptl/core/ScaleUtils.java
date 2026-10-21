@@ -37,7 +37,7 @@ public class ScaleUtils {
             
             doScalingForEntity(player, portal);
             
-            IECamera camera = (IECamera) client.gameRenderer.getMainCamera();
+            IECamera camera = (IECamera) CHelper.getMainCamera();
             camera.ip_setCameraY(
                 ((float) (camera.ip_getCameraY() * portal.getScaling())),
                 ((float) (camera.ip_getLastCameraY() * portal.getScaling()))
@@ -151,7 +151,7 @@ public class ScaleUtils {
         double oldScale = ScaleUtils.getIPortalScaling(entity);
         double newScale = transformScale(portal, oldScale);
         
-        if (!entity.level().isClientSide && isScaleIllegal(newScale)) {
+        if (!entity.level().isClientSide() && isScaleIllegal(newScale)) {
             newScale = 1;
             entity.sendSystemMessage(
                 Component.literal("Scale out of range")
@@ -160,7 +160,7 @@ public class ScaleUtils {
         
         ScaleUtils.setIPortalScaling(entity, newScale);
         
-        if (!entity.level().isClientSide) {
+        if (!entity.level().isClientSide()) {
             McHelper.setEyePos(entity, eyePos, lastTickEyePos);
             McHelper.updateBoundingBox(entity);
         }

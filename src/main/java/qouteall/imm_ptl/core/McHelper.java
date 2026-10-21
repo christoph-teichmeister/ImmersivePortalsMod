@@ -7,6 +7,20 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.MapLike;
+import com.mojang.serialization.RecordBuilder;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.InterpolationHandler;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import java.net.URI;
 import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
@@ -120,7 +134,7 @@ public class McHelper {
         String text
     ) {
         Helper.log(text);
-        player.displayClientMessage(Component.literal(text), false);
+        player.sendSystemMessage(Component.literal(text), false);
     }
     
     public static long getServerGameTime() {
@@ -239,8 +253,8 @@ public class McHelper {
     @SuppressWarnings("JavadocReference")
     @IPVanillaCopy
     public static int getPlayerLoadDistance(ServerPlayer player) {
-        assert player.getServer() != null;
-        int loadDistanceOnServer = getLoadDistanceOnServer(player.getServer());
+        assert player.level().getServer() != null;
+        int loadDistanceOnServer = getLoadDistanceOnServer(player.level().getServer());
         return Mth.clamp(player.requestedViewDistance(), 2, loadDistanceOnServer);
     }
     
@@ -318,10 +332,7 @@ public class McHelper {
         // minecarts, boats and LivingEntity use position interpolation
         // don't make interpolate, or it may interpolate into unloaded chunks
         vehicle.setPos(newVehiclePos.x(), newVehiclePos.y(), newVehiclePos.z());
-        vehicle.lerpTo(
-            newVehiclePos.x(), newVehiclePos.y(), newVehiclePos.z(),
-            vehicle.getYRot(), vehicle.getXRot(), 0
-        );
+        cancelInterpolation(vehicle);
         
         McHelper.setPosAndLastTickPos(
             vehicle, newVehiclePos, newVehicleLastTickPos
@@ -396,12 +407,80 @@ public class McHelper {
     
     
     public static Portal copyEntity(Portal portal) {
-        Portal newPortal = ((Portal) portal.getType().create(portal.level()));
+        Portal newPortal = ((Portal) portal.getType().create(portal.level(), EntitySpawnReason.LOAD));
         
         Validate.notNull(newPortal);
         
-        newPortal.load(portal.saveWithoutId(new CompoundTag()));
+        loadEntityFromTag(newPortal, saveEntityToTag(portal));
         return newPortal;
+    }
+    
+    /**
+     * Replaces the 1.21.1 lerpTo(..., 0): drop pending position interpolation.
+     */
+    public static void cancelInterpolation(Entity entity) {
+        InterpolationHandler interpolation = entity.getInterpolation();
+        if (interpolation != null) {
+            interpolation.cancel();
+        }
+    }
+    
+    /**
+     * Replaces the 1.21.1 {@code entity.saveWithoutId(new CompoundTag())}.
+     */
+    public static CompoundTag saveEntityToTag(Entity entity) {
+        TagValueOutput output = TagValueOutput.createWithContext(
+            ProblemReporter.DISCARDING, entity.registryAccess()
+        );
+        entity.saveWithoutId(output);
+        return output.buildResult();
+    }
+    
+    /**
+     * Replaces the 1.21.1 {@code entity.load(tag)}.
+     */
+    public static void loadEntityFromTag(Entity entity, CompoundTag tag) {
+        entity.load(TagValueInput.create(ProblemReporter.DISCARDING, entity.registryAccess(), tag));
+    }
+    
+    /**
+     * A MapCodec that reads/writes all fields of the surrounding map as a CompoundTag.
+     * Lets code written against CompoundTag keep its exact on-disk layout
+     * with the 26.x ValueInput/ValueOutput API.
+     */
+    public static final MapCodec<CompoundTag> WHOLE_COMPOUND_CODEC = new MapCodec<>() {
+        @Override
+        public <T> Stream<T> keys(DynamicOps<T> ops) {
+            return Stream.empty();
+        }
+        
+        @Override
+        public <T> DataResult<CompoundTag> decode(DynamicOps<T> ops, MapLike<T> input) {
+            CompoundTag tag = new CompoundTag();
+            input.entries().forEach(pair -> {
+                String key = ops.getStringValue(pair.getFirst()).result().orElse(null);
+                if (key != null) {
+                    tag.put(key, ops.convertTo(NbtOps.INSTANCE, pair.getSecond()));
+                }
+            });
+            return DataResult.success(tag);
+        }
+        
+        @Override
+        public <T> RecordBuilder<T> encode(CompoundTag input, DynamicOps<T> ops, RecordBuilder<T> prefix) {
+            for (String key : input.keySet()) {
+                prefix.add(key, NbtOps.INSTANCE.convertTo(ops, input.get(key)));
+            }
+            return prefix;
+        }
+    };
+    
+    public static CompoundTag readWholeCompound(ValueInput input) {
+        return input.read(WHOLE_COMPOUND_CODEC).orElseGet(CompoundTag::new);
+    }
+    
+    public static void writeWholeCompound(ValueOutput output, CompoundTag tag) {
+        output.store(WHOLE_COMPOUND_CODEC, tag);
     }
     
     /**
@@ -410,7 +489,7 @@ public class McHelper {
      * Only check whether the region file exists now.
      */
     public static boolean getDoesRegionFileExist(ResourceKey<Level> toDimension, BlockPos toPos) {
-        ChunkPos chunkPos = new ChunkPos(toPos);
+        ChunkPos chunkPos = ChunkPos.containing(toPos);
         
         LevelStorageSource.LevelStorageAccess storageSource = MiscHelper.getServer().storageSource;
         
@@ -422,8 +501,8 @@ public class McHelper {
     
     public static MutableComponent getLinkText(String link) {
         return Component.literal(link).withStyle(
-            style -> style.withClickEvent(new ClickEvent(
-                ClickEvent.Action.OPEN_URL, link
+            style -> style.withClickEvent(new ClickEvent.OpenUrl(
+                URI.create(link)
             )).withUnderlined(true)
         );
     }
@@ -433,9 +512,11 @@ public class McHelper {
     }
     
     public static void invokeCommandAs(Entity commandSender, List<String> commandList) {
-        CommandSourceStack commandSource = commandSender.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-        MinecraftServer server = commandSender.getServer();
+        MinecraftServer server = commandSender.level().getServer();
         assert server != null;
+        CommandSourceStack commandSource = commandSender
+            .createCommandSourceStackForNameResolution((ServerLevel) commandSender.level())
+            .withPermission(LevelBasedPermissionSet.GAMEMASTER).withSuppressedOutput();
         Commands commandManager = server.getCommands();
         
         for (String command : commandList) {
@@ -455,7 +536,7 @@ public class McHelper {
             return;
         }
         
-        entityTracker.broadcastAndSend(packet);
+        entityTracker.sendToTrackingPlayersAndSelf((Packet<? super ClientGamePacketListener>) packet);
     }
     
     //it's a little bit incorrect with corner glass pane
@@ -808,7 +889,7 @@ public class McHelper {
             }
             
             for (ServerPlayer player : playerList) {
-                player.displayClientMessage(text, false);
+                player.sendSystemMessage(text, false);
             }
             
             return true;
@@ -866,7 +947,7 @@ public class McHelper {
     }
     
     public static int getMaxYExclusive(LevelAccessor world) {
-        return world.getMaxBuildHeight();
+        return world.getMaxY() + 1;
     }
     
     public static int getMaxContentYExclusive(LevelAccessor world) {
@@ -874,11 +955,11 @@ public class McHelper {
     }
     
     public static int getMinSectionY(LevelAccessor world) {
-        return world.getMinSection();
+        return world.getMinSectionY();
     }
     
     public static int getMaxSectionYExclusive(LevelAccessor world) {
-        return world.getMaxSection();
+        return world.getMaxSectionY() + 1;
     }
     
     public static int getYSectionNumber(LevelAccessor world) {
