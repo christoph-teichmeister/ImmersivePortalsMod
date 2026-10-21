@@ -335,12 +335,12 @@ public class CommandStickItem extends Item {
         );
         
         registerBuiltInCommandStick(new Data(
-            "/attribute @s minecraft:generic.scale modifier remove iportal:scaling",
+            "/attribute @s minecraft:scale modifier remove iportal:scaling",
             "imm_ptl.command.reset_iportal_scale",
             Lists.newArrayList("imm_ptl.command_desc.reset_iportal_scale")
         ));
         registerBuiltInCommandStick(new Data(
-            "/attribute @s minecraft:player.block_interaction_range base set 100",
+            "/attribute @s minecraft:block_interaction_range base set 100",
             "imm_ptl.command.long_reach",
             Lists.newArrayList("imm_ptl.command_desc.long_reach")
         ));
