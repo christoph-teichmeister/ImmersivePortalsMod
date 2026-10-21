@@ -9,6 +9,8 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.TextureFilteringMethod;
+import net.minecraft.client.renderer.GlobalSettingsUniform;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
@@ -46,13 +48,17 @@ import qouteall.imm_ptl.core.render.context_management.RenderStates;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 import qouteall.q_misc_util.my_util.LimitedLogger;
 //? if >=26.3 {
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 //?} else {
-/*import com.mojang.blaze3d.buffers.GpuBufferSlice;
+/*import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 *///?}
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -90,6 +96,8 @@ public class MyGameRenderer {
         final FogRenderer fogRenderer = new FogRenderer();
         final ProjectionMatrixBuffer projectionMatrixBuffer =
             new ProjectionMatrixBuffer("imm_ptl portal level");
+        // contains the camera position that the terrain shader uses
+        final GlobalSettingsUniform globalSettingsUniform = new GlobalSettingsUniform();
 
         NestedContext() {
             GameRenderState gameRenderState =
@@ -114,12 +122,16 @@ public class MyGameRenderer {
             fogRenderer.endFrame();
             //? if >=26.2 {
             renderBuffers.endFrame();
-            //?}
+            //?} else {
+            /*submitNodeStorage.endFrame();
+            featureRenderDispatcher.endFrame();
+            *///?}
         }
 
         void close() {
             fogRenderer.close();
             projectionMatrixBuffer.close();
+            globalSettingsUniform.close();
             //? if >=26.2 {
             featureRenderDispatcher.close();
             renderBuffers.close();
@@ -129,6 +141,9 @@ public class MyGameRenderer {
 
     private static final List<NestedContext> nestedContexts = new ArrayList<>();
     private static int nestingDepth = 0;
+    
+    // the level renderers of other dimensions rendered in this frame (vanilla only ends the frame of the main one)
+    private static final Set<LevelRenderer> renderedLevelRenderers = new HashSet<>();
 
     public static void init() {
         IPCGlobal.CLIENT_CLEANUP_EVENT.register(() -> {
@@ -137,6 +152,7 @@ public class MyGameRenderer {
             }
             nestedContexts.clear();
             nestingDepth = 0;
+            renderedLevelRenderers.clear();
         });
     }
 
@@ -160,6 +176,14 @@ public class MyGameRenderer {
         for (NestedContext context : nestedContexts) {
             context.endFrame();
         }
+        //? if >=26.2 {
+        for (LevelRenderer levelRenderer : renderedLevelRenderers) {
+            if (levelRenderer != client.levelRenderer) {
+                levelRenderer.endFrame();
+            }
+        }
+        //?}
+        renderedLevelRenderers.clear();
     }
 
     public static void renderWorldNew(
@@ -232,6 +256,7 @@ public class MyGameRenderer {
         GpuBufferSlice oldProjection = RenderSystem.getProjectionMatrixBuffer();
         ProjectionType oldProjectionType = RenderSystem.getProjectionType();
         GpuBufferSlice oldFog = RenderSystem.getShaderFog();
+        GpuBuffer oldGlobalSettings = RenderSystem.getGlobalSettingsUniform();
         //? if >=26.3 {
         boolean oldIsRenderingLevel = RenderSystem.isRenderingLevel;
         //?}
@@ -244,6 +269,7 @@ public class MyGameRenderer {
         Object irisPipeline = IrisInterface.invoker.getPipeline(worldRenderer);
 
         NestedContext context = acquireContext();
+        renderedLevelRenderers.add(worldRenderer);
 
         // switch (note: it will no longer switch the world that client player is in )
         ((IEMinecraftClient) client).ip_setWorldRenderer(worldRenderer);
@@ -341,6 +367,9 @@ public class MyGameRenderer {
             if (oldFog != null) {
                 RenderSystem.setShaderFog(oldFog);
             }
+            if (oldGlobalSettings != null) {
+                RenderSystem.setGlobalSettingsUniform(oldGlobalSettings);
+            }
 
             IrisInterface.invoker.setPipeline(worldRenderer, irisPipeline);
 
@@ -382,6 +411,9 @@ public class MyGameRenderer {
 
         GameRenderState gameRenderState = gameRendererAccess.ip_getGameRenderState();
         CameraRenderState cameraState = gameRenderState.levelRenderState.cameraRenderState;
+        
+        // the terrain shader positions the sections relative to the camera position in the global settings
+        updateGlobalSettings(context, gameRenderState, cameraState, deltaTracker);
 
         // the projection with view bobbing, see GameRenderer.renderLevel
         // (the nausea/portal spinning effect is not applied to portal views)
@@ -445,6 +477,39 @@ public class MyGameRenderer {
         FrontClipping.disableClipping();
     }
 
+    /**
+     * See GameRenderer.render, which updates it with the outer camera position.
+     */
+    private static void updateGlobalSettings(
+        NestedContext context, GameRenderState gameRenderState, CameraRenderState cameraState,
+        DeltaTracker deltaTracker
+    ) {
+        boolean rgss = gameRenderState.optionsRenderState.textureFiltering == TextureFilteringMethod.RGSS;
+        //? if >=26.3 {
+        context.globalSettingsUniform.update(
+            gameRenderState.windowRenderState.width,
+            gameRenderState.windowRenderState.height,
+            gameRenderState.optionsRenderState.glintStrength,
+            gameRenderState.levelRenderState.gameTime,
+            gameRenderState.levelRenderState.worldPartialTicks,
+            gameRenderState.optionsRenderState.menuBackgroundBlurriness,
+            cameraState.pos,
+            rgss
+        );
+        //?} else {
+        /*context.globalSettingsUniform.update(
+            gameRenderState.windowRenderState.width,
+            gameRenderState.windowRenderState.height,
+            gameRenderState.optionsRenderState.glintStrength,
+            client.level.getGameTime(),
+            deltaTracker,
+            gameRenderState.optionsRenderState.menuBackgroundBlurriness,
+            cameraState.pos,
+            rgss
+        );
+        *///?}
+    }
+    
     /**
      * The current main camera. 26.1.x calls it getMainCamera(), 26.2+ mainCamera().
      */

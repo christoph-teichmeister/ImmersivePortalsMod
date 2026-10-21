@@ -198,48 +198,18 @@ public class FrontClipping {
     }
 
     /**
-     * Replaces the near plane of the perspective projection with the view space plane
-     * (Lengyel, "Oblique View Frustum Depth Projection and Clipping").
-     * The plane equation is {@code dot(plane.xyz, p) + plane.w >= 0} for the kept side.
-     * Handles both the classic [-1,1] depth range (26.1.x) and reversed-Z [0,1] (26.2+).
-     * Leaves the matrix unchanged if the plane cannot be used as near plane.
+     * Replaces the near plane of the perspective projection with the view space plane,
+     * for the depth convention of this MC version. See {@link ObliqueProjection}.
      */
     public static void applyObliqueClipping(Matrix4f projection, double[] viewSpacePlane) {
         Vector4f plane = new Vector4f(
             (float) viewSpacePlane[0], (float) viewSpacePlane[1],
             (float) viewSpacePlane[2], (float) viewSpacePlane[3]
         );
-
-        Matrix4f inverse = new Matrix4f(projection).invert();
-
-        // the plane in clip space: (P^-1)^T * plane
-        Vector4f clipPlane = new Matrix4f(inverse).transpose().transform(new Vector4f(plane));
-
-        // the frustum corner on the far plane that is farthest on the kept side
-        Vector4f farCorner = inverse.transform(new Vector4f(
-            Math.signum(clipPlane.x), Math.signum(clipPlane.y), (float) GpuHelper.FAR_DEPTH, 1
-        ));
-
-        Vector4f row4 = new Vector4f();
-        projection.getRow(3, row4);
-
-        float planeDotCorner = plane.dot(farCorner);
-        float row4DotCorner = row4.dot(farCorner);
-        if (planeDotCorner <= 1e-6f || row4DotCorner <= 0) {
-            return;
-        }
-
-        Vector4f newRow3;
         //? if >=26.2 {
-        // reversed-Z: near plane is z_clip = w_clip, keep w - z = a * plane
-        float a = row4DotCorner / planeDotCorner;
-        newRow3 = new Vector4f(row4).sub(new Vector4f(plane).mul(a));
+        ObliqueProjection.apply(projection, plane, true);
         //?} else {
-        /*// classic: near plane is z_clip = -w_clip, keep z + w = a * plane
-        float a = 2 * row4DotCorner / planeDotCorner;
-        newRow3 = new Vector4f(plane).mul(a).sub(row4);
+        /*ObliqueProjection.apply(projection, plane, false);
         *///?}
-
-        projection.setRow(2, newRow3);
     }
 }

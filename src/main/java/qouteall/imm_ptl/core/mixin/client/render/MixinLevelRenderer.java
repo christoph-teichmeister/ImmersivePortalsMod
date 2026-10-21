@@ -327,6 +327,21 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
         return !ip_isRenderingPortalOfPlayerDimension();
     }
     
+    /**
+     * The outer view of the same dimension (mirrors) still draws from the terrain buffers later in this frame,
+     * do not change them in the portal view. The outer rendering uploads the results afterwards.
+     */
+    @com.llamalad7.mixinextras.injector.WrapWithCondition(
+        method = "render",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;uploadTerrainBuffersToGpu()V"
+        )
+    )
+    private boolean shouldUploadTerrain(SectionRenderDispatcher instance) {
+        return !ip_isRenderingPortalOfPlayerDimension();
+    }
+    
     private static boolean ip_isRenderingPortalOfPlayerDimension() {
         Minecraft client = Minecraft.getInstance();
         return WorldRenderInfo.isRendering() && client.level != null &&
@@ -377,6 +392,19 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
         }
     }
 
+    // the outer view of the same dimension (mirrors) still draws from the terrain buffers later in this frame
+    @com.llamalad7.mixinextras.injector.WrapWithCondition(
+        method = "prepareChunkRenders",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;uploadGlobalGeomBuffersToGPU()V"
+        )
+    )
+    private boolean shouldUploadTerrain(SectionRenderDispatcher instance) {
+        return !(WorldRenderInfo.isRendering() && level != null &&
+            level.dimension() == RenderStates.originalPlayerDimension);
+    }
+    
     // sometimes we change renderDistance but we don't want to reload it
     @Inject(method = "allChanged", at = @At("HEAD"), cancellable = true)
     private void onReloadStarted(CallbackInfo ci) {
