@@ -87,8 +87,10 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
     @Shadow
     private @Nullable ViewArea viewArea;
 
+    // swapped per portal view (IELevelRenderer_Accessor), so not final
     @Shadow
     @Final
+    @org.spongepowered.asm.mixin.Mutable
     private ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections;
 
     @Shadow
