@@ -60,6 +60,24 @@ public interface IEGameRenderer_Accessor {
     void ip_extractCamera(DeltaTracker deltaTracker, float worldPartialTicks, float cameraEntityPartialTicks);
     *///?}
     
+    @Accessor("hudProjection")
+    net.minecraft.client.renderer.Projection ip_getHudProjection();
+    
+    @Accessor("hud3dProjectionMatrixBuffer")
+    net.minecraft.client.renderer.ProjectionMatrixBuffer ip_getHud3dProjectionMatrixBuffer();
+    
+    //? if >=26.3 {
+    @Invoker("renderItemInHand")
+    void ip_renderItemInHand(
+        CameraRenderState cameraState,
+        net.minecraft.client.renderer.state.level.PlayerRenderState playerState,
+        com.mojang.renderpearl.api.textures.GpuTextureView depthTextureView
+    );
+    //?} else {
+    /*@Invoker("renderItemInHand")
+    void ip_renderItemInHand(CameraRenderState cameraState, float deltaPartialTick, org.joml.Matrix4fc modelViewMatrix);
+    *///?}
+    
     //? if >=26.2 {
     @Mutable
     @Accessor("mainRenderTarget")

@@ -77,8 +77,6 @@ public class IPGlobal {
     
     public static boolean offsetOcclusionQuery = true;
     
-    public static boolean cloudOptimization = true;
-    
     public static boolean crossPortalCollision = true;
     
     public static boolean netherPortalOverlay = false;
@@ -89,8 +87,6 @@ public class IPGlobal {
     
     public static boolean easeCreativePermission = true;
     public static boolean easeCommandStickPermission = true;
-    
-    public static boolean enableDepthClampForPortalRendering = true;
     
     public static boolean enableServerCollision = true;
     

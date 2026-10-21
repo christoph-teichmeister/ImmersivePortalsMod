@@ -70,8 +70,6 @@ public class IPConfig implements ConfigData {
     @ConfigEntry.Gui.Excluded
     public boolean visibilityPrediction = true;
     @ConfigEntry.Gui.Excluded
-    public boolean useDepthClampForPortalRendering = true;
-    @ConfigEntry.Gui.Excluded
     public boolean enableCrossPortalView = true;
     @ConfigEntry.Gui.Excluded
     public int portalRenderLimit = 200;
@@ -203,7 +201,6 @@ public class IPConfig implements ConfigData {
         IPGlobal.enableCrossPortalSound = enableCrossPortalSound;
         IPGlobal.checkModInfoFromInternet = checkModInfoFromInternet;
         IPGlobal.enableUpdateNotification = enableUpdateNotification;
-        IPGlobal.enableDepthClampForPortalRendering = useDepthClampForPortalRendering;
         BlockPortalShape.defaultLengthLimit = regularPortalLengthLimit;
         IPGlobal.maxNormalPortalRadius = Math.max(regularPortalLengthLimit / 2, 16);
         IPGlobal.chunkPacketDebug = chunkPacketDebug;

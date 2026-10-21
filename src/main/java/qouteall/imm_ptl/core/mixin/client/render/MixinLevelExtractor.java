@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import com.llamalad7.mixinextras.injector.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -53,14 +54,22 @@ public abstract class MixinLevelExtractor {
 
     private int ip_lastTrackerRepositionFrame = -1;
 
+    @Shadow
+    private double prevCamRotX;
+
+    @Shadow
+    private double prevCamRotY;
+
+    private double ip_outerPrevCamRotX;
+    private double ip_outerPrevCamRotY;
+
     /**
      * The dirty section tracker is a ring buffer around one camera position.
      * Moving it marks all sections that enter it dirty, so moving it back and forth
      * between several cameras in one frame would recompile everything every frame.
      * The player's dimension keeps it around the player camera,
      * the other dimensions move it once per frame.
-     * TODO port: a second portal view into the same dimension in the same frame does not get its
-     *  section updates tracked (1.21.1 kept separate render sections per column, 26.2+ tracks dirtiness separately)
+     * With an {@link ImmPtlViewArea} the tracker is not used, see {@link #wrapGetDirtyState}.
      */
     @WrapOperation(
         method = "extract",
@@ -82,6 +91,81 @@ public abstract class MixinLevelExtractor {
         }
         ip_lastTrackerRepositionFrame = RenderStates.frameIndex;
         original.call(tracker, pos);
+    }
+
+    /**
+     * The tracker only covers the sections around one camera, the sections that another portal view
+     * of this dimension sees in the same frame would never be compiled or updated.
+     * An {@link ImmPtlViewArea} keeps a dirty state in each of its sections instead
+     * (like the per-section dirty flag of 1.21.1 and 26.1.x).
+     */
+    @WrapOperation(
+        method = "extract",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/SectionUpdateTracker;getDirtyState(J)Lnet/minecraft/client/SectionUpdateTracker$SectionDirtyState;"
+        )
+    )
+    private SectionUpdateTracker.SectionDirtyState wrapGetDirtyState(
+        SectionUpdateTracker tracker, long sectionNode, Operation<SectionUpdateTracker.SectionDirtyState> original,
+        @Local(argsOnly = true) Camera camera
+    ) {
+        if (levelRenderer.viewArea() instanceof ImmPtlViewArea viewArea) {
+            return viewArea.getDirtyState(sectionNode, SectionPos.of(camera.position()));
+        }
+        return original.call(tracker, sectionNode);
+    }
+
+    @WrapOperation(
+        method = "setSectionDirty(IIIZ)V",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/SectionUpdateTracker;setDirty(IIIZ)V"
+        )
+    )
+    private void wrapSetDirty(
+        SectionUpdateTracker tracker, int x, int y, int z, boolean playerChanged, Operation<Void> original
+    ) {
+        original.call(tracker, x, y, z, playerChanged);
+        if (levelRenderer.viewArea() instanceof ImmPtlViewArea viewArea) {
+            viewArea.setDirty(x, y, z, playerChanged);
+        }
+    }
+
+    /**
+     * The occlusion graph of the player's dimension serves the outer view,
+     * a portal view of that dimension must not consume its frustum update (the portal view does not apply it).
+     */
+    @WrapOperation(
+        method = "extract",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/SectionOcclusionGraph;consumeFrustumUpdate()Z"
+        )
+    )
+    private boolean wrapConsumeFrustumUpdate(
+        net.minecraft.client.renderer.SectionOcclusionGraph graph, Operation<Boolean> original
+    ) {
+        if (WorldRenderInfo.isRendering() && level != null &&
+            level.dimension() == RenderStates.originalPlayerDimension) {
+            return false;
+        }
+        return original.call(graph);
+    }
+
+    // the outer view compares its camera rotation with the last one to decide whether to apply the frustum
+    @Inject(method = "extract", at = @At("HEAD"))
+    private void onExtractBegin(DeltaTracker deltaTracker, Camera camera, float worldPartialTicks, CallbackInfo ci) {
+        ip_outerPrevCamRotX = prevCamRotX;
+        ip_outerPrevCamRotY = prevCamRotY;
+    }
+
+    @Inject(method = "extract", at = @At("RETURN"))
+    private void onExtractEnd(DeltaTracker deltaTracker, Camera camera, float worldPartialTicks, CallbackInfo ci) {
+        if (WorldRenderInfo.isRendering()) {
+            prevCamRotX = ip_outerPrevCamRotX;
+            prevCamRotY = ip_outerPrevCamRotY;
+        }
     }
 
     /**

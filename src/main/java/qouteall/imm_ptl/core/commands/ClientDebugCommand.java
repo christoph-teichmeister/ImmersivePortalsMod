@@ -593,11 +593,6 @@ public class ClientDebugCommand {
         );
         registerSwitchCommand(
             builder,
-            "cloud_optimization",
-            cond -> IPGlobal.cloudOptimization = cond
-        );
-        registerSwitchCommand(
-            builder,
             "cross_portal_collision",
             cond -> IPGlobal.crossPortalCollision = cond
         );
@@ -605,11 +600,6 @@ public class ClientDebugCommand {
             builder,
             "nofog",
             cond -> IPGlobal.debugDisableFog = cond
-        );
-        registerSwitchCommand(
-            builder,
-            "depth_clamp_for_portal_rendering",
-            cond -> IPGlobal.enableDepthClampForPortalRendering = cond
         );
         registerSwitchCommand(
             builder,

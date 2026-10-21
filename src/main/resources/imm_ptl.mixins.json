@@ -105,6 +105,8 @@
     "client.render.IEGameRenderer_Accessor",
     "client.render.IELevelExtractor_Accessor",
     "client.render.IELevelRenderer_Accessor",
+    "client.render.IESectionDirtyState_Invoker",
+    "client.render.IECloudRenderer_Accessor",
     "client.render.MixinBlockEntityRenderDispatcher",
     "client.render.MixinCamera",
     "client.render.MixinEntityRenderDispatcher",

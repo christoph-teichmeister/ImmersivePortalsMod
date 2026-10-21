@@ -10,6 +10,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.TextureFilteringMethod;
+import net.minecraft.client.renderer.CloudRenderer;
 import net.minecraft.client.renderer.GlobalSettingsUniform;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LevelTargetBundle;
@@ -31,6 +32,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
 import qouteall.imm_ptl.core.CHelper;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.IPCGlobal;
@@ -42,6 +44,7 @@ import qouteall.imm_ptl.core.ducks.IEMinecraftClient;
 import qouteall.imm_ptl.core.ducks.IEParticleManager;
 import qouteall.imm_ptl.core.ducks.IECamera;
 import qouteall.imm_ptl.core.mixin.client.render.IECamera_Accessor;
+import qouteall.imm_ptl.core.mixin.client.render.IECloudRenderer_Accessor;
 import qouteall.imm_ptl.core.mixin.client.render.IEGameRenderState_Accessor;
 import qouteall.imm_ptl.core.mixin.client.render.IEGameRenderer_Accessor;
 import qouteall.imm_ptl.core.mixin.client.render.IELevelRenderer_Accessor;
@@ -59,9 +62,12 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 *///?}
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -71,8 +77,10 @@ import java.util.function.Consumer;
  * Rendering a portal world switches the level, level renderer, (26.2+) level extractor, camera
  * and lightmap, extracts the portal world into a separate LevelRenderState and renders it.
  * The per-frame objects that the outer level rendering is still using (render state, submit node
- * storage, feature dispatcher with its vertex buffers, fog buffer, projection buffer) are swapped
+ * storage, feature dispatcher with its vertex buffers, projection buffer) are swapped
  * with a separate set for each nesting depth, see {@link NestedContext}.
+ * The objects whose GPU data lives in per-frame ring buffers (fog, clouds) exist once per view,
+ * see {@link ViewResources}.
  */
 @Environment(EnvType.CLIENT)
 public class MyGameRenderer {
@@ -98,7 +106,6 @@ public class MyGameRenderer {
         final RenderBuffers renderBuffers = new RenderBuffers(0);
         final SubmitNodeStorage submitNodeStorage;
         final FeatureRenderDispatcher featureRenderDispatcher;
-        final FogRenderer fogRenderer = new FogRenderer();
         final ProjectionMatrixBuffer projectionMatrixBuffer =
             new ProjectionMatrixBuffer("imm_ptl portal level");
         // contains the camera position that the terrain shader uses
@@ -124,7 +131,6 @@ public class MyGameRenderer {
         }
 
         void endFrame() {
-            fogRenderer.endFrame();
             //? if >=26.2 {
             renderBuffers.endFrame();
             //?} else {
@@ -134,7 +140,6 @@ public class MyGameRenderer {
         }
 
         void close() {
-            fogRenderer.close();
             projectionMatrixBuffer.close();
             globalSettingsUniform.close();
             //? if >=26.2 {
@@ -146,6 +151,30 @@ public class MyGameRenderer {
 
     private static final List<NestedContext> nestedContexts = new ArrayList<>();
     private static int nestingDepth = 0;
+
+    /**
+     * FogRenderer and CloudRenderer write their uniforms (and the cloud mesh) into ring buffers that rotate
+     * once per frame. Two views using the same instance in one frame overwrite the data of the first view
+     * before the GPU reads it, and the 26.3 CloudRenderer throws when it rebuilds its mesh three times
+     * in a frame. So each view has its own instances, kept across frames, which also keeps the cloud mesh
+     * of each view instead of rebuilding it every frame (the 1.21.1 CloudContext optimization).
+     */
+    private static class ViewResources {
+        final FogRenderer fogRenderer = new FogRenderer();
+        final CloudRenderer cloudRenderer = new CloudRenderer();
+        int lastUsedFrame;
+
+        void close() {
+            fogRenderer.close();
+            cloudRenderer.close();
+        }
+    }
+
+    // the views are identified by the portal chain, the occurrence separates views with the same chain in a frame
+    private record ViewKey(List<UUID> description, int occurrence) {}
+
+    private static final Map<ViewKey, ViewResources> viewResources = new HashMap<>();
+    private static final Map<List<UUID>, Integer> viewOccurrencesThisFrame = new HashMap<>();
     
     // the level renderers of other dimensions rendered in this frame (vanilla only ends the frame of the main one)
     private static final Set<LevelRenderer> renderedLevelRenderers = new HashSet<>();
@@ -158,6 +187,9 @@ public class MyGameRenderer {
             nestedContexts.clear();
             nestingDepth = 0;
             renderedLevelRenderers.clear();
+            viewResources.values().forEach(ViewResources::close);
+            viewResources.clear();
+            viewOccurrencesThisFrame.clear();
         });
     }
 
@@ -174,6 +206,40 @@ public class MyGameRenderer {
         nestingDepth--;
     }
 
+    private static ViewResources acquireViewResources(LevelRenderer worldRenderer) {
+        List<UUID> description = WorldRenderInfo.getRenderingDescription();
+        int occurrence = viewOccurrencesThisFrame.merge(description, 1, Integer::sum) - 1;
+        ViewResources result = viewResources.computeIfAbsent(
+            new ViewKey(description, occurrence), k -> new ViewResources()
+        );
+        result.lastUsedFrame = RenderStates.frameIndex;
+
+        // only the CloudRenderer of the first LevelRenderer is registered as reload listener
+        IECloudRenderer_Accessor clouds = (IECloudRenderer_Accessor) result.cloudRenderer;
+        CloudRenderer.TextureData texture = getCloudTexture(worldRenderer);
+        if (clouds.ip_getTexture() != texture) {
+            clouds.ip_setTexture(texture);
+            result.cloudRenderer.markForRebuild();
+        }
+        return result;
+    }
+
+    @Nullable
+    private static CloudRenderer.TextureData getCloudTexture(LevelRenderer preferred) {
+        CloudRenderer.TextureData texture =
+            ((IECloudRenderer_Accessor) ((IELevelRenderer_Accessor) preferred).ip_getCloudRenderer()).ip_getTexture();
+        if (texture != null) {
+            return texture;
+        }
+        for (LevelRenderer levelRenderer : ClientWorldLoader.WORLD_RENDERER_MAP.values()) {
+            texture = ((IECloudRenderer_Accessor) ((IELevelRenderer_Accessor) levelRenderer).ip_getCloudRenderer()).ip_getTexture();
+            if (texture != null) {
+                return texture;
+            }
+        }
+        return null;
+    }
+
     /**
      * Called once per frame after the whole frame is rendered.
      */
@@ -181,6 +247,20 @@ public class MyGameRenderer {
         for (NestedContext context : nestedContexts) {
             context.endFrame();
         }
+        viewOccurrencesThisFrame.clear();
+        // ponytail: a view unused for 600 frames releases its buffers, the next use rebuilds its cloud mesh once
+        viewResources.values().removeIf(view -> {
+            if (view.lastUsedFrame == RenderStates.frameIndex) {
+                view.fogRenderer.endFrame();
+                view.cloudRenderer.endFrame();
+                return false;
+            }
+            if (RenderStates.frameIndex - view.lastUsedFrame > 600) {
+                view.close();
+                return true;
+            }
+            return false;
+        });
         //? if >=26.2 {
         for (LevelRenderer levelRenderer : renderedLevelRenderers) {
             if (levelRenderer != client.levelRenderer) {
@@ -275,6 +355,8 @@ public class MyGameRenderer {
         Object irisPipeline = IrisInterface.invoker.getPipeline(worldRenderer);
 
         NestedContext context = acquireContext();
+        ViewResources view = acquireViewResources(worldRenderer);
+        CloudRenderer oldCloudRenderer = levelRendererAccess.ip_getCloudRenderer();
         renderedLevelRenderers.add(worldRenderer);
 
         // switch (note: it will no longer switch the world that client player is in )
@@ -291,6 +373,7 @@ public class MyGameRenderer {
         levelRendererAccess.ip_setFeatureRenderDispatcher(context.featureRenderDispatcher);
         levelRendererAccess.ip_setRenderBuffers(context.renderBuffers);
         levelRendererAccess.ip_setTargets(context.targets);
+        levelRendererAccess.ip_setCloudRenderer(view.cloudRenderer);
         // the outer rendering of the same level renderer (mirrors) keeps its visible sections
         ObjectArrayList<SectionRenderDispatcher.RenderSection> newVisibleSections = VisibleSectionDiscovery.takeList();
         ObjectArrayList<SectionRenderDispatcher.RenderSection> newNearbyVisibleSections = VisibleSectionDiscovery.takeList();
@@ -319,15 +402,21 @@ public class MyGameRenderer {
 
         boolean updateLightmap = !RenderStates.isDimensionRendered(newDimension);
 
+        // the outer level rendering still has its view rotation on the model view stack
+        // (1.21.1 gave each portal view a fresh stack)
+        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        modelViewStack.pushMatrix().identity();
+
         //invoke rendering
         try {
             invokeWrapper.accept(() -> {
                 Profiler.get().push("render_portal_content");
-                extractAndRenderLevel(context, newCamera, helper, updateLightmap);
+                extractAndRenderLevel(context, view, newCamera, helper, updateLightmap);
                 Profiler.get().pop();
             });
         }
         finally {
+            modelViewStack.popMatrix();
             SodiumInterface.invoker.switchContextWithCurrentWorldRenderer(newSodiumContext);
 
             //recover
@@ -344,6 +433,7 @@ public class MyGameRenderer {
             levelRendererAccess.ip_setFeatureRenderDispatcher(oldFeatureRenderDispatcher);
             levelRendererAccess.ip_setRenderBuffers(oldRenderBuffers);
             levelRendererAccess.ip_setTargets(oldTargets);
+            levelRendererAccess.ip_setCloudRenderer(oldCloudRenderer);
             levelRendererAccess.ip_setVisibleSections(oldVisibleSections);
             levelRendererAccess.ip_setNearbyVisibleSections(oldNearbyVisibleSections);
             VisibleSectionDiscovery.returnList(newVisibleSections);
@@ -389,13 +479,10 @@ public class MyGameRenderer {
 
     /**
      * The portal version of GameRenderer.update + extract + renderLevel,
-     * without the hand, screen effects and the post effects.
-     * TODO port: WorldRenderInfo.doRenderHand is ignored (1.21.1 rendered the hand when it was set, only the API used it).
-     * TODO port: the 1.21.1 cloud optimization (reusing the cloud mesh between portal views, CloudContext) is gone,
-     *  a portal view of the same dimension with another cloud cell makes the CloudRenderer rebuild its mesh.
+     * without the screen effects and the post effects (and the hand unless {@link WorldRenderInfo#doRenderHand}).
      */
     private static void extractAndRenderLevel(
-        NestedContext context, Camera camera, DimensionRenderHelper helper, boolean updateLightmap
+        NestedContext context, ViewResources view, Camera camera, DimensionRenderHelper helper, boolean updateLightmap
     ) {
         IEGameRenderer_Accessor gameRendererAccess = (IEGameRenderer_Accessor) client.gameRenderer;
         DeltaTracker deltaTracker = client.getDeltaTracker();
@@ -452,8 +539,8 @@ public class MyGameRenderer {
             context.projectionMatrixBuffer.getBuffer(projectionMatrix), ProjectionType.PERSPECTIVE
         );
 
-        context.fogRenderer.updateBuffer(cameraState.fogData);
-        GpuBufferSlice terrainFog = context.fogRenderer.getBuffer(FogRenderer.FogMode.WORLD);
+        view.fogRenderer.updateBuffer(cameraState.fogData);
+        GpuBufferSlice terrainFog = view.fogRenderer.getBuffer(FogRenderer.FogMode.WORLD);
 
         boolean shouldRenderSky = WorldRenderInfo.getTopRenderInfo().doRenderSky;
 
@@ -462,8 +549,7 @@ public class MyGameRenderer {
             MyRenderHelper.applyMirrorFaceCulling();
         }
 
-        // TODO port: IPGlobal.enableDepthClampForPortalRendering is ignored,
-        //  depth clamp would disable the oblique near plane that clips the content behind the portal
+        // no depth clamp (1.21.1 option useDepthClampForPortalRendering): it would disable the oblique near plane
 
         //? if >=26.3 {
         client.levelRenderer.render(
@@ -489,6 +575,44 @@ public class MyGameRenderer {
         }
 
         FrontClipping.disableClipping();
+
+        if (WorldRenderInfo.getTopRenderInfo().doRenderHand) {
+            renderHand(gameRendererAccess, gameRenderState, cameraState, camera, deltaTracker);
+        }
+    }
+
+    /**
+     * The hand part of GameRenderer.renderLevel (26.3: render3dHud without the screen effects).
+     * Like 1.21.1 it clears the whole depth buffer first, so only API views that cover the target use it.
+     */
+    private static void renderHand(
+        IEGameRenderer_Accessor gameRendererAccess, GameRenderState gameRenderState,
+        CameraRenderState cameraState, Camera camera, DeltaTracker deltaTracker
+    ) {
+        net.minecraft.client.renderer.Projection hudProjection = gameRendererAccess.ip_getHudProjection();
+        //? if >=26.3 {
+        float hudFar = cameraState.depthFar;
+        //?} else {
+        /*float hudFar = 100.0F;
+        *///?}
+        hudProjection.setupPerspective(
+            0.05F, hudFar, cameraState.hudFov,
+            gameRenderState.windowRenderState.width, gameRenderState.windowRenderState.height
+        );
+        RenderSystem.setProjectionMatrix(
+            gameRendererAccess.ip_getHud3dProjectionMatrixBuffer().getBuffer(hudProjection), ProjectionType.PERSPECTIVE
+        );
+        com.mojang.blaze3d.pipeline.RenderTarget mainTarget = GpuHelper.getMainTarget();
+        RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(mainTarget.getDepthTexture(), GpuHelper.FAR_DEPTH);
+        //? if >=26.3 {
+        gameRendererAccess.ip_renderItemInHand(
+            cameraState, gameRenderState.levelRenderState.playerRenderState, mainTarget.getDepthTextureView()
+        );
+        //?} else {
+        /*gameRendererAccess.ip_renderItemInHand(
+            cameraState, camera.getCameraEntityPartialTicks(deltaTracker), cameraState.viewRotationMatrix
+        );
+        *///?}
     }
 
     /**
