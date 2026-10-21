@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.peripheral.dim_stack;
 
+import net.minecraft.server.permissions.Permissions;
 import com.google.gson.JsonObject;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.api.EnvType;
@@ -219,7 +220,7 @@ public class DimStackManagement {
         public static void serverSetupDimStack(
             ServerPlayer player, DimStackInfo dimStackInfo
         ) {
-            if (!player.hasPermissions(2)) {
+            if (!player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                 player.sendSystemMessage(Component.literal(
                     "You don't have permission to change dimension stack"
                 ));
@@ -246,7 +247,7 @@ public class DimStackManagement {
         public static void serverRemoveDimStack(
             ServerPlayer player
         ) {
-            if (!player.hasPermissions(2)) {
+            if (!player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                 Helper.err("one player without permission tries to change dimension stack");
                 return;
             }

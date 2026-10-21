@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.peripheral;
 
+import net.minecraft.server.permissions.Permissions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.mojang.logging.LogUtils;
@@ -150,7 +151,7 @@ public class CommandStickItem extends Item {
             return true;// any player regardless of gamemode can use
         }
         else {
-            return player.hasPermissions(2) || player.isCreative();
+            return player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER) || player.isCreative();
         }
     }
     

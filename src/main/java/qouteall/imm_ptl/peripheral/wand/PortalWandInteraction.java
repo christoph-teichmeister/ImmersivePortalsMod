@@ -1,5 +1,7 @@
 package qouteall.imm_ptl.peripheral.wand;
 
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.server.permissions.Permissions;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.nbt.CompoundTag;
@@ -236,7 +238,7 @@ public class PortalWandInteraction {
             }
         }
         
-        Portal portal = Portal.ENTITY_TYPE.create(McHelper.getServerWorld(firstSideDimension));
+        Portal portal = Portal.ENTITY_TYPE.create(McHelper.getServerWorld(firstSideDimension), EntitySpawnReason.SPAWN_ITEM_USE);
         Validate.notNull(portal);
         portal.setOriginPos(
             firstSideLeftBottom
@@ -522,7 +524,7 @@ public class PortalWandInteraction {
     }
     
     private static boolean canPlayerUsePortalWand(ServerPlayer player) {
-        return player.hasPermissions(2)
+        return player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)
             || (IPGlobal.easeCreativePermission && player.isCreative())
             || (IPConfig.getConfig().portalWandUsableOnSurvivalMode
             && player.gameMode.getGameModeForPlayer() == GameType.SURVIVAL);
@@ -816,7 +818,7 @@ public class PortalWandInteraction {
             return;
         }
         
-        Portal portal = Portal.ENTITY_TYPE.create(player.level());
+        Portal portal = Portal.ENTITY_TYPE.create(player.level(), EntitySpawnReason.SPAWN_ITEM_USE);
         assert portal != null;
         
         portal.readPortalDataFromNbt(copyingSession.portalData);
