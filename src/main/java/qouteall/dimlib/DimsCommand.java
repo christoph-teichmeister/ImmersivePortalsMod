@@ -35,7 +35,7 @@ public class DimsCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         LiteralArgumentBuilder<CommandSourceStack> builder = Commands
             .literal("dims")
-            .requires(source -> source.hasPermission(2));
+            .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
         
         builder.then(Commands
             .literal("clone_dimension")
@@ -131,7 +131,7 @@ public class DimsCommand {
                     MappedRegistry<LevelStem> dimensionRegistry =
                         DimensionImpl.getDimensionRegistry(world.getServer());
                     
-                    LevelStem levelStem = dimensionRegistry.get(world.dimension().identifier());
+                    LevelStem levelStem = dimensionRegistry.getValue(world.dimension().identifier());
                     
                     if (levelStem == null) {
                         context.getSource().sendFailure(

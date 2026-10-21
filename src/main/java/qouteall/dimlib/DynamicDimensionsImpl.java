@@ -18,7 +18,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.level.progress.ChunkProgressListener;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.BiomeManager;
@@ -42,6 +41,7 @@ import qouteall.dimlib.mixin.common.IEWorldBorder;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 public class DynamicDimensionsImpl {
     private static final Logger LOGGER = LogManager.getLogger();
@@ -57,7 +57,7 @@ public class DynamicDimensionsImpl {
         Identifier dimensionId,
         LevelStem levelStem
     ) {
-        /**{@link MinecraftServer#createLevels(ChunkProgressListener)}*/
+        /**{@link MinecraftServer#createLevels()}*/
         
         ResourceKey<Level> dimensionResourceKey = ResourceKey.create(
             Registries.DIMENSION, dimensionId
@@ -78,7 +78,7 @@ public class DynamicDimensionsImpl {
         WorldData worldData = server.getWorldData();
         ServerLevelData serverLevelData = worldData.overworldData();
         
-        long seed = worldData.worldGenOptions().seed();
+        long seed = server.getWorldGenSettings().options().seed();
         long obfuscatedSeed = BiomeManager.obfuscateSeed(seed);
         
         DerivedLevelData derivedLevelData = new DerivedLevelData(
@@ -92,17 +92,15 @@ public class DynamicDimensionsImpl {
             derivedLevelData,
             dimensionResourceKey,
             levelStem,
-            new DummyProgressListener(),
             false, // isDebug
             obfuscatedSeed,
             ImmutableList.of(),
-            false, // only true for overworld
-            overworld.getRandomSequences()
+            false // only true for overworld
         );
         
-        worldBorder.addListener(
-            new BorderChangeListener.DelegateBorderChangeListener(newWorld.getWorldBorder())
-        );
+        // since 1.21.9 every dimension has its own world border (no overworld delegation)
+        newWorld.getWorldBorder().setAbsoluteMaxSize(server.getAbsoluteMaxWorldSize());
+        server.getPlayerList().addWorldborderListener(newWorld);
         
         ((IMinecraftServer) server).dimlib_addDimensionToWorldMap(dimensionResourceKey, newWorld);
         
@@ -120,11 +118,9 @@ public class DynamicDimensionsImpl {
         );
         ((IMappedRegistry) levelStemRegistry).dimlib_setIsFrozen(true);
         
-        worldBorder.applySettings(serverLevelData.getWorldBorder());
-        
         LOGGER.info("Added Dimension {}", dimensionId);
         
-        var dimSyncPacket = ServerPlayNetworking.createS2CPacket(
+        var dimSyncPacket = ServerPlayNetworking.createClientboundPacket(
             DimLibNetworking.DimSyncPacket.createPacket(server)
         );
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -165,10 +161,10 @@ public class DynamicDimensionsImpl {
             
             try {
                 while (world.getChunkSource().chunkMap.hasWork()) {
-                    world.getChunkSource().removeTicketsOnClosing();
+                    world.getChunkSource().deactivateTicketsOnClosing();
                     world.getChunkSource().tick(() -> true, false);
                     world.getChunkSource().pollTask();
-                    server.pollTask();
+                    ((IMinecraftServer) server).dimlib_pollTask();
                     
                     if (System.nanoTime() - lastLogTime > DimLibUtil.secondToNano(1)) {
                         lastLogTime = System.nanoTime();
@@ -209,8 +205,6 @@ public class DynamicDimensionsImpl {
                 LOGGER.error("Error when closing world", e);
             }
             
-            resetWorldBorderListener(server);
-            
             // force remove it from registry, so it will not be saved into level.dat
             Registry<LevelStem> levelStemRegistry = server.registryAccess()
                 .lookupOrThrow(Registries.LEVEL_STEM);
@@ -218,7 +212,7 @@ public class DynamicDimensionsImpl {
             
             LOGGER.info("Removed Dimension {}", dimension.identifier());
             
-            Packet<ClientCommonPacketListener> dimSyncPacket = ServerPlayNetworking.createS2CPacket(
+            Packet<ClientCommonPacketListener> dimSyncPacket = ServerPlayNetworking.createClientboundPacket(
                 DimLibNetworking.DimSyncPacket.createPacket(server)
             );
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -229,24 +223,6 @@ public class DynamicDimensionsImpl {
         });
     }
     
-    private static void resetWorldBorderListener(MinecraftServer server) {
-        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
-        Validate.notNull(overworld, "Overworld is null");
-        
-        WorldBorder worldBorder = overworld.getWorldBorder();
-        List<BorderChangeListener> borderChangeListeners =
-            ((IEWorldBorder) worldBorder).ip_getListeners();
-        borderChangeListeners.clear();
-        for (ServerLevel serverWorld : server.getAllLevels()) {
-            if (serverWorld != overworld) {
-                worldBorder.addListener(
-                    new BorderChangeListener.DelegateBorderChangeListener(serverWorld.getWorldBorder())
-                );
-            }
-        }
-        server.getPlayerList().addWorldborderListener(overworld);
-    }
-    
     private static void evacuatePlayersFromDimension(ServerLevel world) {
         MinecraftServer server = world.getServer();
         ServerLevel overworld = server.getLevel(Level.OVERWORLD);
@@ -254,13 +230,13 @@ public class DynamicDimensionsImpl {
         
         List<ServerPlayer> players = world.getPlayers(p -> true);
         
-        BlockPos sharedSpawnPos = overworld.getSharedSpawnPos();
+        BlockPos sharedSpawnPos = overworld.getRespawnData().pos();
         
         for (ServerPlayer player : players) {
             player.teleportTo(
                 overworld,
                 sharedSpawnPos.getX(), sharedSpawnPos.getY(), sharedSpawnPos.getZ(),
-                0, 0
+                Set.of(), 0, 0, true
             );
             player.sendSystemMessage(
                 Component.literal(
@@ -268,29 +244,6 @@ public class DynamicDimensionsImpl {
                         .formatted(world.dimension().identifier())
                 )
             );
-        }
-    }
-    
-    private static class DummyProgressListener implements ChunkProgressListener {
-        
-        @Override
-        public void updateSpawnPos(ChunkPos center) {
-        
-        }
-        
-        @Override
-        public void onStatusChange(ChunkPos chunkPosition, @Nullable ChunkStatus newStatus) {
-        
-        }
-        
-        @Override
-        public void start() {
-        
-        }
-        
-        @Override
-        public void stop() {
-        
         }
     }
     

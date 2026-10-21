@@ -19,6 +19,8 @@ public interface IMinecraftServer {
     
     void dimlib_waitUntilNextTick();
     
+    boolean dimlib_pollTask();
+    
     boolean dimlib_getCanDirectlyRegisterDimensions();
     
     boolean dimlib_getIsFinishedCreatingWorlds();

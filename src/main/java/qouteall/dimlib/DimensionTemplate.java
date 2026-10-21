@@ -47,7 +47,7 @@ public record DimensionTemplate(
             server.registryAccess().lookupOrThrow(Registries.DIMENSION_TYPE);
         
         Holder.Reference<DimensionType> holder =
-            dimensionTypes.getHolderOrThrow(dimensionTypeId);
+            dimensionTypes.getOrThrow(dimensionTypeId);
         
         return dimensionFactory.createLevelStem(
             server, holder
@@ -67,7 +67,7 @@ public record DimensionTemplate(
             
             Registry<Biome> biomeRegistry = registryAccess.lookupOrThrow(Registries.BIOME);
             
-            Holder.Reference<Biome> plainsHolder = biomeRegistry.getHolderOrThrow(Biomes.PLAINS);
+            Holder.Reference<Biome> plainsHolder = biomeRegistry.getOrThrow(Biomes.PLAINS);
             
             FlatLevelGeneratorSettings flatChunkGeneratorConfig =
                 new FlatLevelGeneratorSettings(
