@@ -1,43 +1,41 @@
 package qouteall.imm_ptl.core.mixin.common.collision;
 
-import net.minecraft.server.level.ServerLevel;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.level.portal.TeleportTransition;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import qouteall.imm_ptl.core.teleportation.ServerTeleportationManager;
 import qouteall.q_misc_util.Helper;
 
 @Mixin(ThrownEnderpearl.class)
 public class MixinThrownEnderPearl {
-    @Inject(
+    /**
+     * 26.x: vanilla onHit teleports the owner with ServerPlayer.teleport(TeleportTransition), which also
+     * changes dimension conventionally. 1.21.1 ImmPtl injected before discard() and did the cross-dimension
+     * teleport itself; here the vanilla teleport is replaced by the ImmPtl one when the dimension differs.
+     */
+    @WrapOperation(
         method = "onHit",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/world/entity/projectile/ThrownEnderpearl;discard()V"
+            target = "Lnet/minecraft/server/level/ServerPlayer;teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/server/level/ServerPlayer;"
         )
     )
-    private void onOnHitDiscard(HitResult result, CallbackInfo ci) {
-        ThrownEnderpearl this_ = (ThrownEnderpearl) (Object) this;
-        
-        Entity owner = this_.getOwner();
-        
-        if (owner instanceof ServerPlayer serverPlayer) {
-            if (serverPlayer.connection.isAcceptingMessages()
-                && serverPlayer.level() != this_.level()
-                && !serverPlayer.isSleeping()
-            ) {
-                Helper.log("Doing cross-dimensional ender pearl teleportation");
-                ServerTeleportationManager.teleportEntityGeneral(
-                    serverPlayer,
-                    this_.position(),
-                    ((ServerLevel) this_.level())
-                );
-            }
+    private ServerPlayer wrapOwnerTeleport(
+        ServerPlayer serverPlayer, TeleportTransition transition, Operation<ServerPlayer> original
+    ) {
+        if (serverPlayer.level() != transition.newLevel() && !serverPlayer.isSleeping()) {
+            Helper.log("Doing cross-dimensional ender pearl teleportation");
+            ServerTeleportationManager.teleportEntityGeneral(
+                serverPlayer,
+                transition.position(),
+                transition.newLevel()
+            );
+            return serverPlayer;
         }
+        return original.call(serverPlayer, transition);
     }
 }

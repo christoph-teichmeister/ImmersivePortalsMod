@@ -10,12 +10,14 @@ import qouteall.imm_ptl.core.IPGlobal;
 @Mixin(AbstractMinecart.class)
 public class MixinAbstractMinecartEntity {
     // for debugging
+    // 26.x: lerpTo is gone (InterpolationHandler); hook the per-step interpolation instead,
+    // jumping straight to the target keeps the 1.21.1 "no interpolation" behaviour
     @Inject(
-        method = "lerpTo",
+        method = "lerpPositionAndRotationStep",
         at = @At("RETURN")
     )
     private void onUpdateTracketPositionAndAngles(
-        double x, double y, double z, float yaw, float pitch, int steps, CallbackInfo ci
+        int stepsToTarget, double x, double y, double z, double yaw, double pitch, CallbackInfo ci
     ) {
         AbstractMinecart this_ = (AbstractMinecart) ((Object) this);
         if (!IPGlobal.allowClientEntityPosInterpolation) {

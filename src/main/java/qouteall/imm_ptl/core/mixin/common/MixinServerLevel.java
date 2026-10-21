@@ -3,6 +3,7 @@ package qouteall.imm_ptl.core.mixin.common;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.PersistentEntitySectionManager;
 import net.minecraft.world.level.storage.SavedDataStorage;
 import net.minecraft.world.level.storage.ServerLevelData;
@@ -51,6 +52,18 @@ public abstract class MixinServerLevel implements IEServerWorld {
             return true;
         }
         return chunkCache.hasActiveTickets();
+    }
+    
+    // Fix overworld rain cause nether fog change
+    // (1.21.1: inject at TAIL of Level.prepareWeather(); 26.x moved it to ServerLevel)
+    @Inject(method = "prepareWeather", at = @At("TAIL"))
+    private void onPrepareWeather(CallbackInfo ci) {
+        ServerLevel this_ = (ServerLevel) (Object) this;
+        if (this_.dimension() == Level.NETHER) {
+            // the setters set both the current and the old value, like the 1.21.1 fix
+            this_.setRainLevel(0);
+            this_.setThunderLevel(0);
+        }
     }
     
     // for debug

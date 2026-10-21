@@ -74,7 +74,12 @@ public abstract class MixinChunkMap_C implements IEChunkMap {
      * @reason
      */
     @Overwrite
-    private void onChunkReadyToSend(LevelChunk chunk) {
+    private void onChunkReadyToSend(ChunkHolder chunkHolder, LevelChunk chunk) {
+        // packets to players are sent by ImmPtl
         ImmPtlChunkTracking.onChunkProvidedDeferred(chunk);
+        
+        // 26.x: keep the vanilla parts that are not about sending to players
+        this.level.getChunkSource().onChunkReadyToSend(chunkHolder);
+        this.level.debugSynchronizers().registerChunk(chunk);
     }
 }

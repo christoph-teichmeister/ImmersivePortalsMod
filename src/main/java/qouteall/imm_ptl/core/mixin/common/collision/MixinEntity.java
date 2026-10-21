@@ -1,5 +1,7 @@
 package qouteall.imm_ptl.core.mixin.common.collision;
 
+import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
@@ -46,6 +48,9 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
     
     @Shadow
     protected abstract Vec3 collide(Vec3 vec3d_1);
+    
+    @Shadow
+    protected abstract AABB makeBoundingBox(Vec3 position);
     
     @Shadow
     public abstract Component getName();
@@ -151,31 +156,35 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
         }
     }
     
-    @Redirect(
-        method = "Lnet/minecraft/world/entity/Entity;checkInsideBlocks()V",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/world/entity/Entity;getBoundingBox()Lnet/minecraft/world/phys/AABB;"
-        )
-    )
-    private AABB redirectBoundingBoxInCheckingBlockCollision(Entity entity) {
-        return ip_getActiveCollisionBox(entity.getBoundingBox());
-    }
-    
+    // 26.x: checkInsideBlocks() became a per-movement-step
+    // checkInsideBlocks(Vec3 from, Vec3 to, StepBasedCollector, LongSet, int) that uses makeBoundingBox(to)
+    // instead of getBoundingBox(). Same idea as in 1.21.1: use the active collision box (the part on this
+    // side of the portal), skip the check if there is none.
     @Inject(
-        method = "checkInsideBlocks",
-        at = @At(
-            value = "INVOKE_ASSIGN",
-            target = "Lnet/minecraft/world/entity/Entity;getBoundingBox()Lnet/minecraft/world/phys/AABB;",
-            shift = At.Shift.AFTER
-        ),
-        locals = LocalCapture.CAPTURE_FAILHARD,
+        method = "checkInsideBlocks(Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/entity/InsideBlockEffectApplier$StepBasedCollector;Lit/unimi/dsi/fastutil/longs/LongSet;I)I",
+        at = @At("HEAD"),
         cancellable = true
     )
-    private void onCheckInsideBlocks(CallbackInfo ci, AABB box) {
-        if (box == null) {
-            ci.cancel();
+    private void onCheckInsideBlocks(
+        Vec3 from, Vec3 to, InsideBlockEffectApplier.StepBasedCollector effectCollector,
+        LongSet visitedBlocks, int maxMovementIterations, CallbackInfoReturnable<Integer> cir
+    ) {
+        if (ip_getActiveCollisionBox(makeBoundingBox(to)) == null) {
+            cir.setReturnValue(0);
         }
+    }
+    
+    @Redirect(
+        method = "checkInsideBlocks(Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/entity/InsideBlockEffectApplier$StepBasedCollector;Lit/unimi/dsi/fastutil/longs/LongSet;I)I",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/world/entity/Entity;makeBoundingBox(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/AABB;"
+        )
+    )
+    private AABB redirectBoundingBoxInCheckingBlockCollision(Entity entity, Vec3 position) {
+        AABB box = makeBoundingBox(position);
+        AABB activeBox = ip_getActiveCollisionBox(box);
+        return activeBox != null ? activeBox : box;
     }
     
     // avoid suffocation when colliding with a portal on wall

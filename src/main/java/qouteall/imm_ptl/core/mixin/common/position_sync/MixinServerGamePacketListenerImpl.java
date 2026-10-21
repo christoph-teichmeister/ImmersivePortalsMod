@@ -216,13 +216,19 @@ public abstract class MixinServerGamePacketListenerImpl implements IEServerPlayN
         this.player.connection.send(lookPacket);
     }
     
+    // 26.x: isPlayerCollidingWithAnythingNew became isEntityCollidingWithAnythingNew (also used for vehicles);
+    // like in 1.21.1 only the player check is changed
     @Inject(
-        method = "isPlayerCollidingWithAnythingNew", at = @At("HEAD"), cancellable = true
+        method = "isEntityCollidingWithAnythingNew", at = @At("HEAD"), cancellable = true
     )
     private void onIsPlayerCollidingWithAnythingNew(
-        LevelReader level, AABB playerBB, double newX, double newY, double newZ, CallbackInfoReturnable<Boolean> cir
+        LevelReader level, Entity entity, AABB playerBB, double newX, double newY, double newZ, CallbackInfoReturnable<Boolean> cir
     ) {
         if (!IPGlobal.crossPortalCollision) {
+            return;
+        }
+        
+        if (entity != player) {
             return;
         }
         
@@ -246,8 +252,9 @@ public abstract class MixinServerGamePacketListenerImpl implements IEServerPlayN
             return;
         }
         
+        // 26.x vanilla uses getPreMoveCollisions here (was getCollisions)
         Iterable<VoxelShape> newBBCollisions =
-            level.getCollisions(this.player, activeNewBB.deflate(1.0E-5F));
+            level.getPreMoveCollisions(this.player, activeNewBB.deflate(1.0E-5F), activePlayerBB.getBottomCenter());
         
         VoxelShape activePlayerBBShape = Shapes.create(activePlayerBB.deflate(1.0E-5F));
         
@@ -277,7 +284,7 @@ public abstract class MixinServerGamePacketListenerImpl implements IEServerPlayN
         method = "handleAcceptTeleportPacket",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/server/level/ServerPlayer;absMoveTo(DDDFF)V"
+            target = "Lnet/minecraft/server/level/ServerPlayer;absSnapTo(DDDFF)V" // was absMoveTo
         )
     )
     private void onHandleAcceptTeleportPacket(
