@@ -1,17 +1,22 @@
 {
   "schemaVersion": 1,
   "id": "immersive_portals",
-  "provides": ["iportal", "imm_ptl_core", "immersive_portals_core"],
+  "provides": [
+    "iportal",
+    "imm_ptl_core",
+    "immersive_portals_core"
+  ],
   "version": "${version}",
   "name": "Immersive Portals",
   "description": "See through portals and travel between dimensions seamlessly.",
   "authors": [
-    "qouteall", "Other Contributors (see GitHub)"
+    "qouteall",
+    "Other Contributors (see GitHub)"
   ],
   "contact": {
     "homepage": "https://qouteall.fun/immptl",
-    "sources": "https://github.com/iPortalTeam/ImmersivePortalsMod",
-    "issues": "https://github.com/iPortalTeam/ImmersivePortalsMod/discussions",
+    "sources": "https://github.com/christoph-teichmeister/ImmersivePortalsMod",
+    "issues": "https://github.com/christoph-teichmeister/ImmersivePortalsMod/issues",
     "email": "qouteall@163.com",
     "discord": "https://discord.gg/BZxgURK"
   },
@@ -44,10 +49,9 @@
     "q_misc_util.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.7.4",
-    "fabric-api": ">=0.109.0",
-    "minecraft": ["1.21", "1.21.1"],
-    "dimlib": "*"
+    "fabricloader": ">=0.19.5",
+    "fabric-api": ">=${fabric_api}",
+    "minecraft": "${minecraft}"
   },
   "breaks": {
     "optifabric": "*",
@@ -56,8 +60,6 @@
     "resolutioncontrol": "*",
     "canvas": "*",
     "cardboard": "*",
-    "iris": ["<1.8.0", ">1.8.0"],
-    "sodium": ["<0.6.0", ">0.6.0"],
     "gravity_api": "*",
     "vmp": "*"
   },
