@@ -39,7 +39,7 @@ public abstract class MixinDistanceManager implements IEDistanceManager {
         ServerPlayer serverPlayer,
         CallbackInfo ci
     ) {
-        long chunkPos = sectionPos.chunk().toLong();
+        long chunkPos = sectionPos.chunk().pack();
         playersPerChunk.computeIfAbsent(chunkPos, k -> new ObjectOpenHashSet<>());
     }
     

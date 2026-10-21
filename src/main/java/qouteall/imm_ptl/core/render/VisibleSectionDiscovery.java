@@ -79,7 +79,7 @@ public class VisibleSectionDiscovery {
                 true
             );
         }
-        else if (cameraPos.y < world.getMinBuildHeight()) {
+        else if (cameraPos.y < world.getMinY()) {
             discoverBottomOrTopLayerVisibleChunks(builtChunks.minSectionY);
         }
         else if (cameraPos.y > world.getMaxBuildHeight()) {

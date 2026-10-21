@@ -14,7 +14,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.ClientCommonPacketListener;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -54,7 +54,7 @@ public class DynamicDimensionsImpl {
     
     public static void addDimensionDynamically(
         MinecraftServer server,
-        ResourceLocation dimensionId,
+        Identifier dimensionId,
         LevelStem levelStem
     ) {
         /**{@link MinecraftServer#createLevels(ChunkProgressListener)}*/
@@ -111,7 +111,7 @@ public class DynamicDimensionsImpl {
          * {@link WorldGenSettings#encode(DynamicOps, WorldOptions, RegistryAccess)} ,
          * so it will be saved into level.dat
          * */
-        Registry<LevelStem> levelStemRegistry = server.registryAccess().registryOrThrow(Registries.LEVEL_STEM);
+        Registry<LevelStem> levelStemRegistry = server.registryAccess().lookupOrThrow(Registries.LEVEL_STEM);
         ((IMappedRegistry) levelStemRegistry).dimlib_setIsFrozen(false);
         ((MappedRegistry<LevelStem>) levelStemRegistry).register(
             ResourceKey.create(Registries.LEVEL_STEM, dimensionId),
@@ -147,7 +147,7 @@ public class DynamicDimensionsImpl {
         
         Validate.isTrue(server.isRunning(), "Server is not running");
         
-        LOGGER.info("Started Removing Dimension {}", dimension.location());
+        LOGGER.info("Started Removing Dimension {}", dimension.identifier());
         
         ((IMinecraftServer) server).dimlib_addTask(() -> {
             DimensionAPI.SERVER_PRE_REMOVE_DIMENSION_EVENT.invoker().accept(world);
@@ -213,10 +213,10 @@ public class DynamicDimensionsImpl {
             
             // force remove it from registry, so it will not be saved into level.dat
             Registry<LevelStem> levelStemRegistry = server.registryAccess()
-                .registryOrThrow(Registries.LEVEL_STEM);
-            ((IMappedRegistry) levelStemRegistry).dimlib_forceRemove(dimension.location());
+                .lookupOrThrow(Registries.LEVEL_STEM);
+            ((IMappedRegistry) levelStemRegistry).dimlib_forceRemove(dimension.identifier());
             
-            LOGGER.info("Removed Dimension {}", dimension.location());
+            LOGGER.info("Removed Dimension {}", dimension.identifier());
             
             Packet<ClientCommonPacketListener> dimSyncPacket = ServerPlayNetworking.createS2CPacket(
                 DimLibNetworking.DimSyncPacket.createPacket(server)
@@ -265,7 +265,7 @@ public class DynamicDimensionsImpl {
             player.sendSystemMessage(
                 Component.literal(
                     "Teleported to spawn pos because dimension %s had been removed"
-                        .formatted(world.dimension().location())
+                        .formatted(world.dimension().identifier())
                 )
             );
         }

@@ -44,7 +44,7 @@ public record DimensionTemplate(
     
     public LevelStem createLevelStem(MinecraftServer server) {
         Registry<DimensionType> dimensionTypes =
-            server.registryAccess().registryOrThrow(Registries.DIMENSION_TYPE);
+            server.registryAccess().lookupOrThrow(Registries.DIMENSION_TYPE);
         
         Holder.Reference<DimensionType> holder =
             dimensionTypes.getHolderOrThrow(dimensionTypeId);
@@ -65,7 +65,7 @@ public record DimensionTemplate(
         (server, dimTypeHolder) -> {
             RegistryAccess.Frozen registryAccess = server.registryAccess();
             
-            Registry<Biome> biomeRegistry = registryAccess.registryOrThrow(Registries.BIOME);
+            Registry<Biome> biomeRegistry = registryAccess.lookupOrThrow(Registries.BIOME);
             
             Holder.Reference<Biome> plainsHolder = biomeRegistry.getHolderOrThrow(Biomes.PLAINS);
             

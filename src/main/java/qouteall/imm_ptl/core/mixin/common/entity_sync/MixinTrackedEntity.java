@@ -151,7 +151,7 @@ public abstract class MixinTrackedEntity implements IETrackedEntity {
         
         var watchRecMap = ImmPtlChunkTracking.getWatchRecordForChunk(
             entity.level().dimension(),
-            entity.chunkPosition().x, entity.chunkPosition().z
+            entity.chunkPosition().x(), entity.chunkPosition().z()
         );
         
         // no need to clamp it with render distance, as we check chunk watch records now

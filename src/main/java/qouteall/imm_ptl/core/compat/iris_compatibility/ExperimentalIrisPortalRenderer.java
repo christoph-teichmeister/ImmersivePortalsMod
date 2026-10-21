@@ -1,6 +1,8 @@
 package qouteall.imm_ptl.core.compat.iris_compatibility;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import net.minecraft.util.profiling.Profiler;
+
+import com.mojang.renderpearl.backend.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
@@ -164,7 +166,7 @@ public class ExperimentalIrisPortalRenderer extends PortalRenderer {
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(true);
         
-        client.getProfiler().popPush("render_portal_total");
+        Profiler.get().popPush("render_portal_total");
         renderPortals(modelView);
     }
     
@@ -217,13 +219,13 @@ public class ExperimentalIrisPortalRenderer extends PortalRenderer {
         
         int outerPortalStencilValue = PortalRendering.getPortalLayer();
         
-        client.getProfiler().push("render_view_area");
+        Profiler.get().push("render_view_area");
         
         boolean anySamplePassed = PortalRenderInfo.renderAndDecideVisibility(portal, () -> {
             renderPortalViewAreaToStencil(portal, modelView);
         });
         
-        client.getProfiler().pop();
+        Profiler.get().pop();
         
         if (!anySamplePassed) {
             setStencilStateForWorldRendering();
@@ -235,9 +237,9 @@ public class ExperimentalIrisPortalRenderer extends PortalRenderer {
         int thisPortalStencilValue = outerPortalStencilValue + 1;
         
         if (!portal.isFuseView()) {
-            client.getProfiler().push("clear_depth_of_view_area");
+            Profiler.get().push("clear_depth_of_view_area");
             clearDepthOfThePortalViewArea(portal);
-            client.getProfiler().pop();
+            Profiler.get().pop();
         }
         
         setStencilStateForWorldRendering();

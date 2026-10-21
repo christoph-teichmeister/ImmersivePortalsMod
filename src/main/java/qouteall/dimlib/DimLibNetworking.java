@@ -15,7 +15,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -35,7 +35,7 @@ public class DimLibNetworking {
         CompoundTag dimIdToTypeIdTag
     ) implements CustomPacketPayload {
         public static final CustomPacketPayload.Type<DimSyncPacket> TYPE =
-            new Type<>(ResourceLocation.parse("dimlib:dim_sync"));
+            new Type<>(Identifier.parse("dimlib:dim_sync"));
         
         public static final StreamCodec<FriendlyByteBuf, DimSyncPacket> CODEC =
             StreamCodec.of((b, p) -> p.write(b), DimSyncPacket::read);
@@ -51,25 +51,25 @@ public class DimLibNetworking {
         
         public static DimSyncPacket createPacket(MinecraftServer server) {
             RegistryAccess registryManager = server.registryAccess();
-            Registry<DimensionType> dimensionTypes = registryManager.registryOrThrow(Registries.DIMENSION_TYPE);
+            Registry<DimensionType> dimensionTypes = registryManager.lookupOrThrow(Registries.DIMENSION_TYPE);
             
             CompoundTag dimIdToDimTypeId = new CompoundTag();
             for (ServerLevel world : server.getAllLevels()) {
                 ResourceKey<Level> dimId = world.dimension();
                 
                 DimensionType dimType = world.dimensionType();
-                ResourceLocation dimTypeId = dimensionTypes.getKey(dimType);
+                Identifier dimTypeId = dimensionTypes.getKey(dimType);
                 
                 if (dimTypeId == null) {
-                    LOGGER.error("Cannot find dimension type for {}", dimId.location());
+                    LOGGER.error("Cannot find dimension type for {}", dimId.identifier());
                     LOGGER.error(
                         "Registered dimension types {}", dimensionTypes.keySet()
                     );
-                    dimTypeId = BuiltinDimensionTypes.OVERWORLD.location();
+                    dimTypeId = BuiltinDimensionTypes.OVERWORLD.identifier();
                 }
                 
                 dimIdToDimTypeId.putString(
-                    dimId.location().toString(),
+                    dimId.identifier().toString(),
                     dimTypeId.toString()
                 );
             }
@@ -86,12 +86,12 @@ public class DimLibNetworking {
             for (String key : tag.getAllKeys()) {
                 ResourceKey<Level> dimId = ResourceKey.create(
                     Registries.DIMENSION,
-                    ResourceLocation.parse(key)
+                    Identifier.parse(key)
                 );
-                String dimTypeId = tag.getString(key);
+                String dimTypeId = tag.getStringOr(key, "");
                 ResourceKey<DimensionType> dimType = ResourceKey.create(
                     Registries.DIMENSION_TYPE,
-                    ResourceLocation.parse(dimTypeId)
+                    Identifier.parse(dimTypeId)
                 );
                 builder.put(dimId, dimType);
             }

@@ -6,7 +6,7 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -27,7 +27,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.vehicle.AbstractMinecart;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -231,9 +231,9 @@ public class Portal extends Entity implements
     
     @Override
     protected void readAdditionalSaveData(CompoundTag compoundTag) {
-        width = compoundTag.getDouble("width");
-        height = compoundTag.getDouble("height");
-        thickness = compoundTag.getDouble("thickness");
+        width = compoundTag.getDoubleOr("width", 0.0);
+        height = compoundTag.getDoubleOr("height", 0.0);
+        thickness = compoundTag.getDoubleOr("thickness", 0.0);
         axisW = Helper.getVec3d(compoundTag, "axisW").normalize();
         axisH = Helper.getVec3d(compoundTag, "axisH").normalize();
         dimensionTo = Helper.getWorldId(compoundTag, "dimensionTo");
@@ -241,7 +241,7 @@ public class Portal extends Entity implements
         specificPlayerId = Helper.getUuid(compoundTag, "specificPlayer");
         
         if (compoundTag.contains("portalShape")) {
-            CompoundTag portalShapeTag = compoundTag.getCompound("portalShape");
+            CompoundTag portalShapeTag = compoundTag.getCompoundOrEmpty("portalShape");
             PortalShape portalShape = PortalShapeSerialization.deserialize(portalShapeTag);
             if (portalShape == null) {
                 LOGGER.error("Cannot deserialize portal shape {}", portalShapeTag);
@@ -257,16 +257,16 @@ public class Portal extends Entity implements
             
             if (compoundTag.contains("specialShape")) {
                 // if missing, it will be false
-                boolean shapeNormalized = compoundTag.getBoolean("shapeNormalized");
+                boolean shapeNormalized = compoundTag.getBooleanOr("shapeNormalized", false);
                 
                 if (shapeNormalized) {
                     mesh2D = GeometryPortalShape.readOldMeshFromTag(
-                        compoundTag.getList("specialShape", 6)
+                        compoundTag.getListOrEmpty("specialShape")
                     );
                 }
                 else {
                     mesh2D = GeometryPortalShape.readOldMeshFromTagNonNormalized(
-                        compoundTag.getList("specialShape", 6),
+                        compoundTag.getListOrEmpty("specialShape"),
                         width / 2, height / 2
                     );
                 }
@@ -284,14 +284,14 @@ public class Portal extends Entity implements
         }
         
         if (compoundTag.contains("teleportable")) {
-            teleportable = compoundTag.getBoolean("teleportable");
+            teleportable = compoundTag.getBooleanOr("teleportable", false);
         }
         
         if (compoundTag.contains("rotationA")) {
             setRotationTransformationD(new DQuaternion(
-                compoundTag.getFloat("rotationB"),
-                compoundTag.getFloat("rotationC"),
-                compoundTag.getFloat("rotationD"),
+                compoundTag.getFloatOr("rotationB", 0f),
+                compoundTag.getFloatOr("rotationC", 0f),
+                compoundTag.getFloatOr("rotationD", 0f),
                 compoundTag.getFloat("rotationA")
             ));
         }
@@ -300,40 +300,40 @@ public class Portal extends Entity implements
         }
         
         if (compoundTag.contains("interactable")) {
-            interactable = compoundTag.getBoolean("interactable");
+            interactable = compoundTag.getBooleanOr("interactable", false);
         }
         
         if (compoundTag.contains("scale")) {
-            scaling = compoundTag.getDouble("scale");
+            scaling = compoundTag.getDoubleOr("scale", 0.0);
         }
         if (compoundTag.contains("teleportChangesScale")) {
-            teleportChangesScale = compoundTag.getBoolean("teleportChangesScale");
+            teleportChangesScale = compoundTag.getBooleanOr("teleportChangesScale", false);
         }
         if (compoundTag.contains("teleportChangesGravity")) {
-            teleportChangesGravity = compoundTag.getBoolean("teleportChangesGravity");
+            teleportChangesGravity = compoundTag.getBooleanOr("teleportChangesGravity", false);
         }
         else {
             teleportChangesGravity = IPConfig.getConfig().portalsChangeGravityByDefault;
         }
         
         if (compoundTag.contains("portalTag")) {
-            portalTag = compoundTag.getString("portalTag");
+            portalTag = compoundTag.getStringOr("portalTag", "");
         }
         
         if (compoundTag.contains("fuseView")) {
-            fuseView = compoundTag.getBoolean("fuseView");
+            fuseView = compoundTag.getBooleanOr("fuseView", false);
         }
         
         if (compoundTag.contains("renderingMergable")) {
-            renderingMergable = compoundTag.getBoolean("renderingMergable");
+            renderingMergable = compoundTag.getBooleanOr("renderingMergable", false);
         }
         
         if (compoundTag.contains("hasCrossPortalCollision")) {
-            crossPortalCollisionEnabled = compoundTag.getBoolean("hasCrossPortalCollision");
+            crossPortalCollisionEnabled = compoundTag.getBooleanOr("hasCrossPortalCollision", false);
         }
         
         if (compoundTag.contains("commandsOnTeleported")) {
-            ListTag list = compoundTag.getList("commandsOnTeleported", 8);
+            ListTag list = compoundTag.getListOrEmpty("commandsOnTeleported");
             commandsOnTeleported = list.stream()
                 .map(t -> ((StringTag) t).getAsString()).collect(Collectors.toList());
         }
@@ -342,14 +342,14 @@ public class Portal extends Entity implements
         }
         
         if (compoundTag.contains("doRenderPlayer")) {
-            doRenderPlayer = compoundTag.getBoolean("doRenderPlayer");
+            doRenderPlayer = compoundTag.getBooleanOr("doRenderPlayer", false);
         }
         else {
             doRenderPlayer = true;
         }
         
         if (compoundTag.contains("isVisible")) {
-            visible = compoundTag.getBoolean("isVisible");
+            visible = compoundTag.getBooleanOr("isVisible", false);
         }
         else {
             visible = true;
@@ -1001,7 +1001,7 @@ public class Portal extends Entity implements
             if (level() instanceof ServerLevel serverLevel) {
                 ServerLevel destWorld = serverLevel.getServer().getLevel(dimensionTo);
                 if (destWorld == null) {
-                    LOGGER.error("Portal Dest Dimension Missing {}", dimensionTo.location());
+                    LOGGER.error("Portal Dest Dimension Missing {}", dimensionTo.identifier());
                     return false;
                 }
                 boolean inWorldBorder = destWorld.getWorldBorder().isWithinBounds(BlockPos.containing(getDestPos()));
@@ -1024,7 +1024,7 @@ public class Portal extends Entity implements
     private boolean isPortalValidClient() {
         boolean contains = ClientWorldLoader.getServerDimensions().contains(dimensionTo);
         if (!contains) {
-            LOGGER.error("Client Portal Dest Dimension Missing {}", dimensionTo.location());
+            LOGGER.error("Client Portal Dest Dimension Missing {}", dimensionTo.identifier());
         }
         return contains;
     }
@@ -1045,8 +1045,8 @@ public class Portal extends Entity implements
             getClass().getSimpleName(),
             getId(),
             getApproximateFacingDirection(),
-            level().dimension().location(), getX(), getY(), getZ(),
-            dimensionTo.location(), getDestPos().x, getDestPos().y, getDestPos().z,
+            level().dimension().identifier(), getX(), getY(), getZ(),
+            dimensionTo.identifier(), getDestPos().x, getDestPos().y, getDestPos().z,
             specificPlayerId != null ? (",specificAccessor:" + specificPlayerId.toString()) : "",
             hasScaling() ? (",scale:" + scaling) : "",
             portalTag != null ? "," + portalTag : ""
@@ -1653,7 +1653,7 @@ public class Portal extends Entity implements
     }
     
     public Direction getTransformedGravityDirection(Direction oldGravityDir) {
-        Vec3 oldGravityVec = Vec3.atLowerCornerOf(oldGravityDir.getNormal());
+        Vec3 oldGravityVec = Vec3.atLowerCornerOf(oldGravityDir.getUnitVec3i());
         
         Vec3 newGravityVec = transformLocalVecNonScale(oldGravityVec);
         

@@ -3,7 +3,7 @@ package qouteall.q_misc_util.my_util;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.Tuple;
+import qouteall.q_misc_util.my_util.Tuple;
 import net.minecraft.world.phys.Vec3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -450,9 +450,9 @@ public class DQuaternion {
             return DQuaternion.identity;
         }
         return new DQuaternion(
-            compoundTag.getDouble("x"),
-            compoundTag.getDouble("y"),
-            compoundTag.getDouble("z"),
+            compoundTag.getDoubleOr("x", 0.0),
+            compoundTag.getDoubleOr("y", 0.0),
+            compoundTag.getDoubleOr("z", 0.0),
             compoundTag.getDouble("w")
         );
     }

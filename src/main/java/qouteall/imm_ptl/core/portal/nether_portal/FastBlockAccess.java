@@ -36,12 +36,12 @@ public record FastBlockAccess(
         ChunkPos centerChunkPos,
         int radiusChunks
     ) {
-        int lowerCX = centerChunkPos.x - radiusChunks;
+        int lowerCX = centerChunkPos.x() - radiusChunks;
         int lowerCY = world.getMinSection();
-        int lowerCZ = centerChunkPos.z - radiusChunks;
-        int upperCX = centerChunkPos.x + radiusChunks;
+        int lowerCZ = centerChunkPos.z() - radiusChunks;
+        int upperCX = centerChunkPos.x() + radiusChunks;
         int upperCY = world.getMaxSection();
-        int upperCZ = centerChunkPos.z + radiusChunks;
+        int upperCZ = centerChunkPos.z() + radiusChunks;
         
         return from(world, lowerCX, upperCX, lowerCY, upperCY, lowerCZ, upperCZ);
     }
