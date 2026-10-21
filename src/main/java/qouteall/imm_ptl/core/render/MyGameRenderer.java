@@ -12,6 +12,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.TextureFilteringMethod;
 import net.minecraft.client.renderer.GlobalSettingsUniform;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.LevelTargetBundle;
 import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.RenderBuffers;
@@ -90,6 +91,8 @@ public class MyGameRenderer {
      */
     private static class NestedContext {
         final LevelRenderState levelRenderState = new LevelRenderState();
+        // the frame graph resource handles, the outer frame still reads them after a portal view of the same renderer
+        final LevelTargetBundle targets = new LevelTargetBundle();
         final RenderBuffers renderBuffers = new RenderBuffers(0);
         final SubmitNodeStorage submitNodeStorage;
         final FeatureRenderDispatcher featureRenderDispatcher;
@@ -249,6 +252,7 @@ public class MyGameRenderer {
         SubmitNodeStorage oldSubmitNodeStorage = levelRendererAccess.ip_getSubmitNodeStorage();
         FeatureRenderDispatcher oldFeatureRenderDispatcher = levelRendererAccess.ip_getFeatureRenderDispatcher();
         RenderBuffers oldRenderBuffers = levelRendererAccess.ip_getRenderBuffers();
+        LevelTargetBundle oldTargets = levelRendererAccess.ip_getTargets();
         ObjectArrayList<SectionRenderDispatcher.RenderSection> oldVisibleSections =
             levelRendererAccess.ip_getVisibleSections();
         ObjectArrayList<SectionRenderDispatcher.RenderSection> oldNearbyVisibleSections =
@@ -283,6 +287,7 @@ public class MyGameRenderer {
         levelRendererAccess.ip_setSubmitNodeStorage(context.submitNodeStorage);
         levelRendererAccess.ip_setFeatureRenderDispatcher(context.featureRenderDispatcher);
         levelRendererAccess.ip_setRenderBuffers(context.renderBuffers);
+        levelRendererAccess.ip_setTargets(context.targets);
         // the outer rendering of the same level renderer (mirrors) keeps its visible sections
         ObjectArrayList<SectionRenderDispatcher.RenderSection> newVisibleSections = VisibleSectionDiscovery.takeList();
         ObjectArrayList<SectionRenderDispatcher.RenderSection> newNearbyVisibleSections = VisibleSectionDiscovery.takeList();
@@ -338,6 +343,7 @@ public class MyGameRenderer {
             levelRendererAccess.ip_setSubmitNodeStorage(oldSubmitNodeStorage);
             levelRendererAccess.ip_setFeatureRenderDispatcher(oldFeatureRenderDispatcher);
             levelRendererAccess.ip_setRenderBuffers(oldRenderBuffers);
+            levelRendererAccess.ip_setTargets(oldTargets);
             levelRendererAccess.ip_setVisibleSections(oldVisibleSections);
             levelRendererAccess.ip_setNearbyVisibleSections(oldNearbyVisibleSections);
             VisibleSectionDiscovery.returnList(newVisibleSections);
