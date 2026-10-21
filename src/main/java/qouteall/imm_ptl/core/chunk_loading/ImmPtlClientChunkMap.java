@@ -1,6 +1,7 @@
 package qouteall.imm_ptl.core.chunk_loading;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import java.util.Map;
@@ -17,6 +18,7 @@ import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.apache.commons.lang3.Validate;
 import org.apache.logging.log4j.LogManager;
@@ -78,6 +80,9 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
                 chunkMap.remove(chunkPos.pack());
             });
             
+            //? if >=26.2 {
+            onChunkRemoved(chunk);
+            //?}
             O_O.postClientChunkUnloadEvent(chunk);
             this.level.unload(chunk);
             SodiumInterface.invoker.onClientChunkUnloaded(level, chunkPos.x(), chunkPos.z());
@@ -164,9 +169,15 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
             modifyChunkMap(chunkMap -> {
                 chunkMap.put(chunkPosLong, worldChunkToPut);
             });
+            //? if >=26.2 {
+            onChunkAdded(worldChunk);
+            //?}
         }
         else {
             loadChunkDataFromPacket(worldChunk, loader);
+            //? if >=26.2 {
+            refreshEmptySections(worldChunk);
+            //?}
         }
         
         this.level.onChunkLoaded(new ChunkPos(x, z));
@@ -252,4 +263,85 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
         *///?}
     }
     
+
+    //? if >=26.2 {
+    // 26.2+: the vanilla occlusion graph only sees the chunks and empty sections reported in these sets
+    // (the vanilla storage of this class is unused). Double buffered like ClientChunkCache.Storage,
+    // the LevelExtractor reads them and flips them once per frame.
+    private final LongOpenHashSet[] addedEmptySections = {new LongOpenHashSet(), new LongOpenHashSet()};
+    private final LongOpenHashSet[] removedEmptySections = {new LongOpenHashSet(), new LongOpenHashSet()};
+    private final LongOpenHashSet[] addedLoadedChunks = {new LongOpenHashSet(), new LongOpenHashSet()};
+    private final LongOpenHashSet[] removedLoadedChunks = {new LongOpenHashSet(), new LongOpenHashSet()};
+    private int updatingSetsIndex = 0;
+    
+    @Override
+    public LongOpenHashSet addedEmptySections() {
+        return addedEmptySections[updatingSetsIndex];
+    }
+    
+    @Override
+    public LongOpenHashSet removedEmptySections() {
+        return removedEmptySections[updatingSetsIndex];
+    }
+    
+    @Override
+    public LongOpenHashSet addedLoadedChunks() {
+        return addedLoadedChunks[updatingSetsIndex];
+    }
+    
+    @Override
+    public LongOpenHashSet removedLoadedChunks() {
+        return removedLoadedChunks[updatingSetsIndex];
+    }
+    
+    @Override
+    public void flipUpdateTrackingSets() {
+        updatingSetsIndex = (updatingSetsIndex + 1) % 2;
+        addedEmptySections[updatingSetsIndex].clear();
+        removedEmptySections[updatingSetsIndex].clear();
+        addedLoadedChunks[updatingSetsIndex].clear();
+        removedLoadedChunks[updatingSetsIndex].clear();
+    }
+    
+    @Override
+    public void onSectionEmptinessChanged(int sectionX, int sectionY, int sectionZ, boolean empty) {
+        markSectionEmpty(SectionPos.asLong(sectionX, sectionY, sectionZ), empty);
+    }
+    
+    private void onChunkAdded(LevelChunk chunk) {
+        long chunkNode = chunk.getPos().pack();
+        removedLoadedChunks[updatingSetsIndex].remove(chunkNode);
+        addedLoadedChunks[updatingSetsIndex].add(chunkNode);
+        refreshEmptySections(chunk);
+    }
+    
+    private void onChunkRemoved(LevelChunk chunk) {
+        ChunkPos chunkPos = chunk.getPos();
+        long chunkNode = chunkPos.pack();
+        addedLoadedChunks[updatingSetsIndex].remove(chunkNode);
+        removedLoadedChunks[updatingSetsIndex].add(chunkNode);
+        for (int i = 0; i < chunk.getSections().length; i++) {
+            long sectionNode = SectionPos.asLong(chunkPos.x(), chunk.getSectionYFromSectionIndex(i), chunkPos.z());
+            //? if >=26.3 {
+            markSectionEmpty(sectionNode, true);
+            //?} else {
+            /*markSectionEmpty(sectionNode, false); // 26.2 drops the sections of unloaded chunks from the empty set
+            *///?}
+        }
+    }
+    
+    private void refreshEmptySections(LevelChunk chunk) {
+        ChunkPos chunkPos = chunk.getPos();
+        LevelChunkSection[] sections = chunk.getSections();
+        for (int i = 0; i < sections.length; i++) {
+            long sectionNode = SectionPos.asLong(chunkPos.x(), chunk.getSectionYFromSectionIndex(i), chunkPos.z());
+            markSectionEmpty(sectionNode, sections[i].hasOnlyAir());
+        }
+    }
+    
+    private void markSectionEmpty(long sectionNode, boolean empty) {
+        (empty ? removedEmptySections : addedEmptySections)[updatingSetsIndex].remove(sectionNode);
+        (empty ? addedEmptySections : removedEmptySections)[updatingSetsIndex].add(sectionNode);
+    }
+    //?}
 }
