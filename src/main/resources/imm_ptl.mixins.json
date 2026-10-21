@@ -115,6 +115,7 @@
     "client.render.MixinLevelRenderer",
     "client.render.MixinLevelRenderer_ForceMainThreadRebuild",
     "client.render.MixinLevelRenderer_Optional",
+    "client.render.MixinRenderTypeFeatureRenderer",
     "client.render.MixinRenderSection",
     "client.render.MixinScreenEffectRenderer",
     "client.render.MixinSectionRenderDispatcher",

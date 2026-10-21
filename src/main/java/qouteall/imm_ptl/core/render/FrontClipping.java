@@ -1,6 +1,7 @@
 package qouteall.imm_ptl.core.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -10,9 +11,21 @@ import org.joml.Vector4f;
 import qouteall.imm_ptl.core.CHelper;
 import qouteall.imm_ptl.core.IPCGlobal;
 import qouteall.imm_ptl.core.IPGlobal;
-import qouteall.imm_ptl.core.portal.Portal;
+import net.minecraft.client.renderer.rendertype.RenderType;
+//? if >=26.3 {
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
+//?} else if >=26.2 {
+/*import com.mojang.blaze3d.PrimitiveTopology;
+import com.mojang.blaze3d.vertex.VertexFormat;
+*///?} else {
+/*import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
+*///?}
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 import qouteall.q_misc_util.my_util.Plane;
+
+import java.util.List;
 
 /**
  * Clipping the content behind the portal plane.
@@ -23,8 +36,8 @@ import qouteall.q_misc_util.my_util.Plane;
  * in the projection matrix, see {@link #applyObliqueClipping}. It is applied to the whole
  * portal world rendering (terrain, entities, particles, weather, sky).
  * <p>
- * TODO port: per-draw clipping is not available any more. The outer clipping of entities that are
- *  halfway through a portal ({@link #setupOuterClipping}) and per-layer toggling have no effect.
+ * Per-draw clipping is not available any more. The entities that are halfway through a portal
+ * are clipped on the CPU instead, see {@link #beginEntityClipping}.
  */
 public class FrontClipping {
     private static final Minecraft client = Minecraft.getInstance();
@@ -118,49 +131,78 @@ public class FrontClipping {
         };
     }
 
-    public static void setupOuterClipping(PoseStack matrixStack, Portal portal) {
-        if (!IPCGlobal.useFrontClipping) {
-            return;
-        }
+    // the planes that clip the entity geometry on the CPU, see ClippingVertexConsumer
+    private static double @Nullable [][] entityClipPlanes;
 
-        double[] clipEquationOuter = getClipEquationOuter(portal);
-
-        if (clipEquationOuter != null) {
-            activeClipPlaneEquationBeforeModelView = clipEquationOuter;
-            activeClipPlaneAfterModelView = transformClipEquation(
-                activeClipPlaneEquationBeforeModelView, matrixStack.last().pose()
-            );
-            enableClipping();
+    /**
+     * Clips the entity geometry that is prepared until {@link #endEntityClipping()}.
+     * 26.x has no per-draw clip planes, the entities that are halfway through a portal
+     * are cut on the CPU (see {@link ClippingVertexConsumer} and {@link CrossPortalEntityRenderer}).
+     *
+     * @param planes    the kept side is the positive side of each plane
+     * @param cameraPos the vertex positions are relative to this camera position
+     */
+    public static void beginEntityClipping(List<Plane> planes, Vec3 cameraPos) {
+        double[][] equations = new double[planes.size()][];
+        for (int i = 0; i < planes.size(); i++) {
+            Plane plane = planes.get(i);
+            Vec3 n = plane.normal();
+            // n * (p + cameraPos - planePos) >= 0
+            equations[i] = new double[]{
+                n.x, n.y, n.z, n.dot(cameraPos.subtract(plane.pos()))
+            };
         }
-        else {
-            activeClipPlaneEquationBeforeModelView = null;
-            disableClipping();
-        }
+        entityClipPlanes = equations;
     }
 
-    // "double @Nullable []" is weird...
-    private static double @Nullable [] getClipEquationOuter(Portal portal) {
-        @Nullable Plane outerClipping = portal.getPortalShape()
-            .getOuterClipping(portal.getThisSideState());
+    public static void endEntityClipping() {
+        entityClipPlanes = null;
+    }
 
-        if (outerClipping == null) {
-            return null;
+    /**
+     * Wraps the vertex consumer of an entity draw into a {@link ClippingVertexConsumer}
+     * while entity clipping is active. Called by the feature renderers (26.2+) or the buffer source (26.1.x).
+     */
+    public static VertexConsumer wrapEntityVertexConsumer(VertexConsumer consumer, RenderType renderType) {
+        double[][] planes = entityClipPlanes;
+        if (planes == null || planes.length == 0) {
+            return consumer;
         }
-
-        Vec3 planeNormal = outerClipping.normal();
-
-        Vec3 cameraPos = CHelper.getCurrentCameraPos();
-
-        Vec3 portalPos = outerClipping.pos()
-            .subtract(cameraPos);
-
-        //equation: planeNormal * p + c > 0
-        //-planeNormal * portalCenter = c
-        double c = planeNormal.scale(-1).dot(portalPos);
-
-        return new double[]{
-            planeNormal.x, planeNormal.y, planeNormal.z, c
+        //? if >=26.2 {
+        if (renderType.primitiveTopology() != PrimitiveTopology.QUADS) {
+            return consumer;
+        }
+        //?} else {
+        /*if (renderType.mode() != VertexFormat.Mode.QUADS) {
+            return consumer;
+        }
+        *///?}
+        VertexFormat format = renderType.format();
+        int mask = 0;
+        //? if >=26.2 {
+        String[] names = {"Position", "Color", "UV0", "UV1", "UV2", "UV3", "Normal", "LineWidth"};
+        for (int i = 0; i < names.length; i++) {
+            if (format.contains(names[i])) {
+                mask |= 1 << i;
+            }
+        }
+        //?} else {
+        /*VertexFormatElement[] elements = {
+            VertexFormatElement.POSITION, VertexFormatElement.COLOR, VertexFormatElement.UV0,
+            VertexFormatElement.UV1, VertexFormatElement.UV2, null,
+            VertexFormatElement.NORMAL, VertexFormatElement.LINE_WIDTH
         };
+        for (int i = 0; i < elements.length; i++) {
+            if (elements[i] != null && format.contains(elements[i])) {
+                mask |= 1 << i;
+            }
+        }
+        *///?}
+        if (Integer.bitCount(mask) != format.getElements().size()) {
+            // an unknown vertex element, the vertex end could not be detected
+            return consumer;
+        }
+        return new ClippingVertexConsumer(consumer, mask, planes);
     }
 
     public static double[] getActiveClipPlaneEquationBeforeModelView() {

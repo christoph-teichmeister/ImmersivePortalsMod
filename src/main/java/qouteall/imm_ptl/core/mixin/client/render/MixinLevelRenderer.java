@@ -28,6 +28,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.IPCGlobal;
 import qouteall.imm_ptl.core.ducks.IEWorldRenderer;
+import qouteall.imm_ptl.core.render.CrossPortalEntityRenderer;
 import qouteall.imm_ptl.core.render.GpuHelper;
 import qouteall.imm_ptl.core.render.ImmPtlViewArea;
 import qouteall.imm_ptl.core.render.context_management.FogRendererContext;
@@ -72,10 +73,11 @@ import java.util.OptionalDouble;
  *     <li>26.3: the classic transparency shares the render pass with the solid things,
  *     so it is deferred to a separate pass after the portals</li>
  * </ul>
- * The 1.21.1 hooks for per-layer clipping, entity rendering, sky rendering, weather,
+ * The entities that are halfway through a portal are drawn clipped right before the portals,
+ * see {@link CrossPortalEntityRenderer}.
+ * The 1.21.1 hooks for per-layer clipping, sky rendering, weather,
  * glowing and the fabulous translucent target are gone with the immediate mode rendering,
- * see the notes in {@link qouteall.imm_ptl.core.render.FrontClipping} and
- * {@link qouteall.imm_ptl.core.render.CrossPortalEntityRenderer}.
+ * see the notes in {@link qouteall.imm_ptl.core.render.FrontClipping}.
  */
 @Mixin(value = LevelRenderer.class)
 public abstract class MixinLevelRenderer implements IEWorldRenderer {
@@ -161,6 +163,7 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
         ip_deferredTranslucentSections = null;
         ip_deferredTranslucentFrame = null;
         
+        CrossPortalEntityRenderer.renderCrossPortalEntities();
         IPCGlobal.renderer.onBeforeTranslucentRendering(ip_getCurrentModelView());
         
         if (sections != null && frame != null) {
@@ -191,6 +194,7 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
         )
     )
     private void ip_onBeforeTranslucent(CallbackInfo ci) {
+        CrossPortalEntityRenderer.renderCrossPortalEntities();
         IPCGlobal.renderer.onBeforeTranslucentRendering(ip_getCurrentModelView());
     }
     *///?} else {
@@ -202,6 +206,7 @@ public abstract class MixinLevelRenderer implements IEWorldRenderer {
         )
     )
     private void ip_onBeforeTranslucent(CallbackInfo ci) {
+        CrossPortalEntityRenderer.renderCrossPortalEntities();
         IPCGlobal.renderer.onBeforeTranslucentRendering(ip_getCurrentModelView());
     }
     *///?}
