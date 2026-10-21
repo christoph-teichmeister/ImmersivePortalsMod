@@ -88,7 +88,7 @@ public class TransformationManager {
     private static void processTransformation(Camera camera, PoseStack matrixStack) {
         DQuaternion currentAnimationDelta = getCurrentAnimationDelta();
         if (currentAnimationDelta != null) {
-            matrixStack.mulPose(currentAnimationDelta.toMcQuaternion());
+            matrixStack.mulPose(new Matrix4f().rotation(currentAnimationDelta.toMcQuaternion()));
         }
         
         WorldRenderInfo.applyAdditionalTransformations(matrixStack);

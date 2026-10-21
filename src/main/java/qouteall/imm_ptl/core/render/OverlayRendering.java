@@ -1,17 +1,17 @@
 package qouteall.imm_ptl.core.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.QuadInstance;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -23,12 +23,15 @@ import qouteall.imm_ptl.core.compat.sodium_compatibility.SodiumInterface;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.nether_portal.BlockPortalShape;
 import qouteall.imm_ptl.core.portal.nether_portal.BreakablePortalEntity;
-import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 26.x: BakedModel is replaced by BlockStateModel/BlockStateModelPart, the overlay quads are submitted
+ * as custom geometry of the entity rendering.
+ */
 @Environment(EnvType.CLIENT)
 public class OverlayRendering {
     private static final RandomSource random = RandomSource.create();
@@ -48,7 +51,7 @@ public class OverlayRendering {
     public static void onRenderPortalEntity(
         Portal portal,
         PoseStack matrixStack,
-        MultiBufferSource vertexConsumerProvider
+        SubmitNodeCollector submitNodeCollector
     ) {
         if (IrisInterface.invoker.isShaders()) {
             if (!shaderOverlayWarned) {
@@ -64,23 +67,30 @@ public class OverlayRendering {
                 ((BreakablePortalEntity) portal),
                 RenderStates.getPartialTick(),
                 matrixStack,
-                vertexConsumerProvider
+                submitNodeCollector
             );
         }
     }
     
-    public static List<BakedQuad> getQuads(BakedModel model, BlockState blockState, Vec3 portalNormal) {
-        Direction facing = Direction.getNearest(portalNormal.x, portalNormal.y, portalNormal.z);
+    public static List<BakedQuad> getQuads(BlockStateModel model, BlockState blockState, Vec3 portalNormal) {
+        Direction facing = Direction.getApproximateNearest(portalNormal.x, portalNormal.y, portalNormal.z);
+        
+        List<BlockStateModelPart> parts = new ArrayList<>();
+        random.setSeed(0);
+        model.collectParts(random, parts);
         
         List<BakedQuad> result = new ArrayList<>();
         
-        result.addAll(model.getQuads(blockState, facing, random));
-        
-        result.addAll(model.getQuads(blockState, null, random));
+        for (BlockStateModelPart part : parts) {
+            result.addAll(part.getQuads(facing));
+            result.addAll(part.getQuads(null));
+        }
         
         if (result.isEmpty()) {
-            for (Direction direction : Direction.values()) {
-                result.addAll(model.getQuads(blockState, direction, random));
+            for (BlockStateModelPart part : parts) {
+                for (Direction direction : Direction.values()) {
+                    result.addAll(part.getQuads(direction));
+                }
             }
         }
         
@@ -94,12 +104,8 @@ public class OverlayRendering {
         BreakablePortalEntity portal,
         float partialTick,
         PoseStack matrixStack,
-        MultiBufferSource vertexConsumerProvider
+        SubmitNodeCollector submitNodeCollector
     ) {
-//        if (PortalRendering.isRendering()) {
-//            return;
-//        }
-        
         BreakablePortalEntity.OverlayInfo overlay = portal.getActualOverlay();
         
         if (overlay == null) {
@@ -108,62 +114,57 @@ public class OverlayRendering {
         
         BlockState blockState = overlay.blockState();
         
-        Vec3 cameraPos = CHelper.getCurrentCameraPos();
-        
         if (blockState == null) {
             return;
         }
-        
-        BlockRenderDispatcher blockRenderManager = Minecraft.getInstance().getBlockRenderer();
         
         BlockPortalShape blockPortalShape = portal.blockPortalShape;
         if (blockPortalShape == null) {
             return;
         }
         
-        matrixStack.pushPose();
-        
-        Vec3 offset = portal.getNormal().scale(overlay.offset());
-        
-        Vec3 pos = portal.position();
-        
-        matrixStack.translate(offset.x, offset.y, offset.z);
-        
-        BakedModel model = blockRenderManager.getBlockModel(blockState);
-        RenderType renderLayer = Sheets.translucentCullBlockSheet();
-        VertexConsumer buffer = vertexConsumerProvider.getBuffer(renderLayer);
+        BlockStateModel model = Minecraft.getInstance().getModelManager()
+            .getBlockStateModelSet().get(blockState);
         
         List<BakedQuad> quads = getQuads(model, blockState, portal.getNormal());
         
-        random.setSeed(0);
-        
-        for (BlockPos blockPos : blockPortalShape.area) {
-            matrixStack.pushPose();
-            matrixStack.translate(
-                blockPos.getX() - pos.x, blockPos.getY() - pos.y, blockPos.getZ() - pos.z
-            );
-            
-            if (overlay.rotation() != null) {
-                matrixStack.mulPose(overlay.rotation().toMcQuaternion());
-            }
-            
-            for (BakedQuad quad : quads) {
-                SodiumInterface.invoker.markSpriteActive(quad.getSprite());
-                buffer.putBulkData(
-                    matrixStack.last(),
-                    quad,
-                    new float[]{1.0F, 1.0F, 1.0F, 1.0F},
-                    1.0f, 1.0f, 1.0f, (float) overlay.opacity(),
-                    new int[]{14680304, 14680304, 14680304, 14680304},//packed light value
-                    OverlayTexture.NO_OVERLAY,
-                    true
-                );
-            }
-            
-            matrixStack.popPose();
+        for (BakedQuad quad : quads) {
+            SodiumInterface.invoker.markSpriteActive(quad.materialInfo().sprite());
         }
         
-        matrixStack.popPose();
+        Vec3 offset = portal.getNormal().scale(overlay.offset());
+        Vec3 pos = portal.position();
         
+        QuadInstance quadInstance = new QuadInstance();
+        quadInstance.setColor(((int) (overlay.opacity() * 255) << 24) | 0xFFFFFF);
+        quadInstance.setLightCoords(14680304);//packed light value
+        quadInstance.setOverlayCoords(OverlayTexture.NO_OVERLAY);
+        
+        submitNodeCollector.submitCustomGeometry(
+            matrixStack, Sheets.translucentBlockItemSheet(),
+            (pose, buffer) -> {
+                PoseStack poseStack = new PoseStack();
+                poseStack.last().set(pose);
+                
+                poseStack.translate(offset.x, offset.y, offset.z);
+                
+                for (BlockPos blockPos : blockPortalShape.area) {
+                    poseStack.pushPose();
+                    poseStack.translate(
+                        blockPos.getX() - pos.x, blockPos.getY() - pos.y, blockPos.getZ() - pos.z
+                    );
+                    
+                    if (overlay.rotation() != null) {
+                        poseStack.mulPose(new org.joml.Matrix4f().rotation(overlay.rotation().toMcQuaternion()));
+                    }
+                    
+                    for (BakedQuad quad : quads) {
+                        buffer.putBakedQuad(poseStack.last(), quad, quadInstance);
+                    }
+                    
+                    poseStack.popPose();
+                }
+            }
+        );
     }
 }

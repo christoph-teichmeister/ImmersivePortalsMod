@@ -8,7 +8,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.RenderBuffers;
-import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.util.profiling.Profiler;
+import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Final;
@@ -24,55 +25,61 @@ import qouteall.imm_ptl.core.IPCGlobal;
 import qouteall.imm_ptl.core.IPGlobal;
 import qouteall.imm_ptl.core.ducks.IEMinecraftClient;
 import qouteall.imm_ptl.core.miscellaneous.ClientPerformanceMonitor;
-import qouteall.imm_ptl.core.miscellaneous.IPortalInitialScreen;
-import qouteall.imm_ptl.core.platform_specific.IPConfig;
 import qouteall.imm_ptl.core.portal.animation.ClientPortalAnimationManagement;
 import qouteall.imm_ptl.core.portal.animation.StableClientTimer;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 import qouteall.imm_ptl.core.teleportation.ClientTeleportationManager;
-
+//? if <26.2 {
+/*import qouteall.imm_ptl.core.miscellaneous.IPortalInitialScreen;
+import qouteall.imm_ptl.core.platform_specific.IPConfig;
 import java.util.List;
 import java.util.function.Function;
+*///?}
 
 @Mixin(Minecraft.class)
 public abstract class MixinMinecraft implements IEMinecraftClient {
-    @Final
-    @Shadow
-    @Mutable
-    private RenderTarget mainRenderTarget;
-    
-    @Shadow
-    public Screen screen;
-    
+
     @Mutable
     @Shadow
     @Final
     public LevelRenderer levelRenderer;
-    
+
     @Shadow
     private static int fps;
-    
-    @Shadow
-    public abstract ProfilerFiller getProfiler();
-    
+
     @Shadow
     @Nullable
     public ClientLevel level;
-    
+
+    @Shadow
+    @Final
+    private static Logger LOGGER;
+
+    @Shadow
+    private Thread gameThread;
+
+    //? if >=26.2 {
+    @Shadow
+    @Final
+    public net.minecraft.client.renderer.GameRenderer gameRenderer;
+    //?} else {
+    /*@Final
+    @Shadow
+    @Mutable
+    private RenderTarget mainRenderTarget;
+
+    @Shadow
+    public Screen screen;
+
     @Mutable
     @Shadow
     @Final
     private RenderBuffers renderBuffers;
-    
-    @Shadow
-    @Final
-    private static Logger LOGGER;
-    
-    @Shadow private Thread gameThread;
-    
+    *///?}
+
     @WrapOperation(
-        method = "Lnet/minecraft/client/Minecraft;run()V",
+        method = "run()V",
         at = @At(
             value = "INVOKE",
             target = "Ljava/lang/Thread;currentThread()Ljava/lang/Thread;"
@@ -82,7 +89,7 @@ public abstract class MixinMinecraft implements IEMinecraftClient {
         LOGGER.info("[ImmPtl] MixinExtra is working!");
         return original.call();
     }
-    
+
     /**
      * The whole process involving portal animation and teleportation:
      * - begin ticking
@@ -101,23 +108,9 @@ public abstract class MixinMinecraft implements IEMinecraftClient {
      * - partialTick should be 1
      * - loop
      */
-    @Inject(
-        method = "tick",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/client/multiplayer/ClientLevel;tickEntities()V"
-        )
-    )
-    private void onBeforeTickingEntities(CallbackInfo ci) {
-//        RenderStates.tickDelta = 1;
-//        StableClientTimer.update(level.getGameTime(), RenderStates.tickDelta);
-//        ClientPortalAnimationManagement.update();
-//        IPCGlobal.clientTeleportationManager.manageTeleportation(true);
-    }
-    
     // this happens after ticking client world and entities
     @Inject(
-        method = "Lnet/minecraft/client/Minecraft;tick()V",
+        method = "tick()V",
         at = @At(
             value = "INVOKE",
             target = "Lnet/minecraft/client/multiplayer/ClientLevel;tick(Ljava/util/function/BooleanSupplier;)V",
@@ -125,94 +118,140 @@ public abstract class MixinMinecraft implements IEMinecraftClient {
         )
     )
     private void onAfterClientTick(CallbackInfo ci) {
-        getProfiler().push("imm_ptl_client_tick");
-        
+        Profiler.get().push("imm_ptl_client_tick");
+
         // including ticking remote worlds
         ClientWorldLoader.tick();
-        
+
         RenderStates.setPartialTick(0);
         StableClientTimer.tick();
         StableClientTimer.update(level.getGameTime(), RenderStates.getPartialTick());
         ClientPortalAnimationManagement.tick(); // must be after remote world ticking
         ClientTeleportationManager.manageTeleportation(true);
-        
+
         IPGlobal.POST_CLIENT_TICK_EVENT.invoker().run();
-        
-        getProfiler().pop();
+
+        Profiler.get().pop();
     }
-    
+
+    // 26.x: the fps counter is updated in renderFrame (was runTick)
     @Inject(
-        method = "Lnet/minecraft/client/Minecraft;runTick(Z)V",
+        method = "renderFrame(Z)V",
         at = @At(
             value = "FIELD",
             target = "Lnet/minecraft/client/Minecraft;fps:I",
+            opcode = org.objectweb.asm.Opcodes.PUTSTATIC,
             shift = At.Shift.AFTER
         )
     )
     private void onSnooperUpdate(boolean tick, CallbackInfo ci) {
         ClientPerformanceMonitor.updateEverySecond(fps);
     }
-    
+
     @Inject(
-        method = "Lnet/minecraft/client/Minecraft;updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;)V",
+        method = "updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;)V",
         at = @At("HEAD")
     )
     private void onSetWorld(ClientLevel clientLevel, CallbackInfo ci) {
         if (ClientWorldLoader.getIsInitialized()) {
             LOGGER.info("Client cleanup");
             IPCGlobal.CLIENT_CLEANUP_EVENT.invoker().run();
-            
+
             if (clientLevel == null) {
                 LOGGER.info("Client exit world");
                 IPCGlobal.CLIENT_EXIT_EVENT.invoker().run();
             }
-            
+
             ClientWorldLoader.cleanUp();
         }
         else {
             LOGGER.info("Client world updated but not counted as cleanup");
         }
     }
-    
-    //avoid messing up rendering states in fabulous
-    @Inject(method = "Lnet/minecraft/client/Minecraft;useShaderTransparency()Z", at = @At("HEAD"), cancellable = true)
+
+    //avoid render glowing entities when rendering portal
+    @Inject(method = "shouldEntityAppearGlowing", at = @At("HEAD"), cancellable = true)
+    private void onShouldEntityAppearGlowing(Entity entity, CallbackInfoReturnable<Boolean> cir) {
+        if (WorldRenderInfo.isRendering()) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    //? if <26.2 {
+    /*//avoid messing up rendering states in fabulous
+    @Inject(method = "useShaderTransparency()Z", at = @At("HEAD"), cancellable = true)
     private static void onIsFabulousGraphicsOrBetter(CallbackInfoReturnable<Boolean> cir) {
         if (WorldRenderInfo.isRendering()) {
             cir.setReturnValue(false);
         }
     }
-    
+
+    // 26.2+: the initial screens are built in Gui, see MixinGui_InitialScreens
     @Inject(
         method = "addInitialScreens",
         at = @At("RETURN")
     )
-    private void onAddInitialScreens(List<Function<Runnable, Screen>> output, CallbackInfo ci) {
+    private void onAddInitialScreens(List<Function<Runnable, Screen>> output, CallbackInfoReturnable<Boolean> cir) {
         IPConfig config = IPConfig.getConfig();
         if (!config.initialScreenShown) {
             output.add(IPortalInitialScreen::new);
         }
     }
-    
+    *///?}
+
     @Override
     public void ip_setFrameBuffer(RenderTarget buffer) {
-        mainRenderTarget = buffer;
+        //? if >=26.2 {
+        ((qouteall.imm_ptl.core.mixin.client.render.IEGameRenderer_Accessor) gameRenderer)
+            .ip_setMainRenderTarget(buffer);
+        //?} else {
+        /*mainRenderTarget = buffer;
+        *///?}
     }
-    
+
     @Override
     public Screen ip_getCurrentScreen() {
-        return screen;
+        //? if >=26.2 {
+        return ((Minecraft) (Object) this).gui.screen();
+        //?} else {
+        /*return screen;
+        *///?}
     }
-    
+
     @Override
     public void ip_setWorldRenderer(LevelRenderer r) {
         levelRenderer = r;
+
+        //? if >=26.2 {
+        // the level extractor belongs to the level renderer, switch it too
+        if (ClientWorldLoader.getIsInitialized()) {
+            for (ClientLevel world : ClientWorldLoader.getClientWorlds()) {
+                net.minecraft.client.renderer.extract.LevelExtractor extractor =
+                    ((qouteall.imm_ptl.core.mixin.client.accessor.IEClientLevel_Accessor) world).ip_getLevelExtractor();
+                if (extractor != null &&
+                    ((qouteall.imm_ptl.core.mixin.client.render.IELevelExtractor_Accessor) extractor)
+                        .ip_getLevelRenderer() == r
+                ) {
+                    ((qouteall.imm_ptl.core.mixin.client.accessor.IEMinecraft_Accessor) this)
+                        .ip_setLevelExtractor(extractor);
+                    break;
+                }
+            }
+        }
+        //?}
     }
-    
+
+    /**
+     * 26.2+: the render buffers belong to the GameRenderer and the LevelRenderer,
+     * the portal rendering swaps the LevelRenderer ones (see MyGameRenderer).
+     */
     @Override
     public void ip_setRenderBuffers(RenderBuffers arg) {
-        renderBuffers = arg;
+        //? if <26.2 {
+        /*renderBuffers = arg;
+        *///?}
     }
-    
+
     @Override
     public Thread ip_getRunningThread() {
         return gameThread;

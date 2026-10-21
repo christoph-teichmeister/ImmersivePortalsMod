@@ -1,7 +1,6 @@
 package qouteall.imm_ptl.core.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.renderpearl.backend.opengl.GlStateManager;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -52,7 +51,7 @@ public class GuiPortalRendering {
         
         MyRenderHelper.restoreViewPort();
         
-        RenderTarget mcFb = MyGameRenderer.client.getMainRenderTarget();
+        RenderTarget mcFb = GpuHelper.getMainTarget();
         
         Validate.isTrue(mcFb != framebuffer);
         
@@ -60,12 +59,8 @@ public class GuiPortalRendering {
         
         if (!worldRenderInfo.doRenderSky) {
             // pre-clear the framebuffer with 0 alpha, if it doesn't render the sky
-            GlStateManager._colorMask(true, true, true, true);
-            framebuffer.setClearColor(0, 0, 0, 0);
-            framebuffer.clear(true);
+            GpuHelper.clearColorAndDepth(framebuffer, 0, 0, 0, 0);
         }
-        
-        framebuffer.bindWrite(true);
         
         IPCGlobal.renderer.prepareRendering();
         
@@ -74,8 +69,6 @@ public class GuiPortalRendering {
         IPCGlobal.renderer.finishRendering();
         
         ((IEMinecraftClient) MyGameRenderer.client).ip_setFrameBuffer(mcFb);
-        
-        mcFb.bindWrite(true);
         
         renderingFrameBuffer = null;
         
@@ -99,9 +92,9 @@ public class GuiPortalRendering {
         
         Validate.isTrue(!renderingTasks.containsKey(renderTarget));
         
-        RenderTarget mcFB = Minecraft.getInstance().getMainRenderTarget();
+        RenderTarget mcFB = GpuHelper.getMainTarget();
         if (renderTarget.width != mcFB.width || renderTarget.height != mcFB.height) {
-            renderTarget.resize(mcFB.width, mcFB.height, true);
+            renderTarget.resize(mcFB.width, mcFB.height);
             LOGGER.info("Resized Framebuffer for GUI Portal Rendering");
         }
         
