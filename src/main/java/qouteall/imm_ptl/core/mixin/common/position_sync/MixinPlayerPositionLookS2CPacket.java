@@ -46,14 +46,18 @@ public class MixinPlayerPositionLookS2CPacket implements IEPlayerPositionLookS2C
         return StreamCodec.of(
             (buf, packet) -> {
                 original.encode(buf, packet);
-                buf.writeResourceKey(((IEPlayerPositionLookS2CPacket) (Object) packet).ip_getPlayerDimension());
+                // nullable: a packet not created by MixinServerGamePacketListenerImpl.teleport has no dimension
+                buf.writeNullable(
+                    ((IEPlayerPositionLookS2CPacket) (Object) packet).ip_getPlayerDimension(),
+                    FriendlyByteBuf::writeResourceKey
+                );
             },
             buf -> {
                 ClientboundPlayerPositionPacket packet = original.decode(buf);
                 // decoding only happens on client
                 if (ImmPtlNetworkConfig.doesServerHaveImmPtl()) {
                     ((IEPlayerPositionLookS2CPacket) (Object) packet)
-                        .ip_setPlayerDimension(buf.readResourceKey(Registries.DIMENSION));
+                        .ip_setPlayerDimension(buf.readNullable(b -> b.readResourceKey(Registries.DIMENSION)));
                 }
                 return packet;
             }

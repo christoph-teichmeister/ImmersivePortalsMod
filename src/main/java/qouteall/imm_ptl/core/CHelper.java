@@ -26,6 +26,7 @@ import qouteall.imm_ptl.core.ducks.IEClientWorld;
 import qouteall.imm_ptl.core.platform_specific.O_O;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.animation.StableClientTimer;
+import qouteall.imm_ptl.core.render.MyGameRenderer;
 import qouteall.q_misc_util.Helper;
 
 import java.net.URI;
@@ -123,11 +124,7 @@ public class CHelper {
     }
     
     public static Camera getMainCamera() {
-        //? if >=26.2 {
-        return Minecraft.getInstance().gameRenderer.mainCamera();
-        //?} else {
-        /*return Minecraft.getInstance().gameRenderer.getMainCamera();*/
-        //?}
+        return MyGameRenderer.getMainCamera();
     }
     
     public static void openLinkConfirmScreen(
@@ -146,7 +143,7 @@ public class CHelper {
     }
     
     public static Vec3 getCurrentCameraPos() {
-        return getMainCamera().position();
+        return MyGameRenderer.getMainCamera().position();
     }
     
     public static Iterable<Entity> getWorldEntityList(Level world) {

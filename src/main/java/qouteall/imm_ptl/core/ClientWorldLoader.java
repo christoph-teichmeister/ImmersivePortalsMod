@@ -42,6 +42,7 @@ import qouteall.imm_ptl.core.ducks.IEWorld;
 import qouteall.imm_ptl.core.ducks.IEWorldRenderer;
 import qouteall.imm_ptl.core.mixin.client.accessor.IEClientLevelData;
 import qouteall.imm_ptl.core.mixin.client.accessor.IEClientLevel_Accessor;
+import qouteall.imm_ptl.core.mixin.client.render.IEGameRenderer_Accessor;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.render.context_management.DimensionRenderHelper;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
@@ -77,8 +78,9 @@ public class ClientWorldLoader {
     //? if >=26.2 {
     /**
      * 26.2+: the level-bound part of the old LevelRenderer (level ref, section dirty tracking, extraction)
-     * moved into LevelExtractor. Each dimension gets its own, next to its LevelRenderer.
-     * TODO port: the render port decides how these are swapped in (Minecraft.levelExtractor is final).
+     * moved into LevelExtractor. Each dimension gets its own, next to its LevelRenderer
+     * (also passed to its ClientLevel). IEMinecraftClient.ip_setWorldRenderer swaps Minecraft.levelExtractor
+     * together with the LevelRenderer.
      */
     public static final Map<ResourceKey<Level>, LevelExtractor> LEVEL_EXTRACTOR_MAP =
         new Object2ObjectOpenHashMap<>();
@@ -145,12 +147,17 @@ public class ClientWorldLoader {
         boolean lightmapTextureConflict = false;
         for (DimensionRenderHelper helper : RENDER_HELPER_MAP.values()) {
             helper.tick();
-            // TODO port: lightmap conflict check. 1.21.1 compared helper.lightmapTexture with
-            //  GameRenderer.lightTexture(); 26.x has a private GameRenderer.lightmap (Lightmap)
-            //  and the type of DimensionRenderHelper.lightmapTexture is up to the render port.
-            //  Original check:
-            //  if (helper.world != CLIENT.level && helper.lightmapTexture == <current lightmap>) {
-            //      LOGGER.info("Lightmap Texture Conflict {} {}", ...); lightmapTextureConflict = true; }
+            if (helper.world != CLIENT.level &&
+                helper.lightmapTexture == ((IEGameRenderer_Accessor) CLIENT.gameRenderer).ip_getLightmap()
+            ) {
+                assert CLIENT.level != null;
+                LOGGER.info(
+                    "Lightmap Texture Conflict {} {}",
+                    helper.world.dimension().identifier(),
+                    CLIENT.level.dimension().identifier()
+                );
+                lightmapTextureConflict = true;
+            }
         }
         if (lightmapTextureConflict) {
             disposeRenderHelpers();
@@ -621,7 +628,7 @@ public class ClientWorldLoader {
         CLIENT.level = newWorld;
         ((IEParticleManager) CLIENT.particleEngine).ip_setWorld(newWorld);
         ((IEMinecraftClient) CLIENT).ip_setWorldRenderer(newWorldRenderer);
-        // TODO port: 26.2+ Minecraft.levelExtractor is not switched here (render port decides)
+        // 26.2+: this also switches Minecraft.levelExtractor (see MixinMinecraft)
         ((IEClientPlayNetworkHandler) networkHandler).ip_setWorld(newWorld);
         isWorldSwitched = true;
         
