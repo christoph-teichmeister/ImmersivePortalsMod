@@ -93,7 +93,7 @@ public class CHelper {
     }
     
     public static void printChat(Component text) {
-        getChat().addMessage(text);
+        getChat().addClientSystemMessage(text);
     }
     
     // version-neutral wrappers for client APIs that moved between 26.1 and 26.2

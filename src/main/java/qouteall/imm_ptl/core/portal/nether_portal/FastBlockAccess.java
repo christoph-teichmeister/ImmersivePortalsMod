@@ -40,7 +40,7 @@ public record FastBlockAccess(
         int lowerCY = world.getMinSectionY();
         int lowerCZ = centerChunkPos.z() - radiusChunks;
         int upperCX = centerChunkPos.x() + radiusChunks;
-        int upperCY = world.getMaxSection();
+        int upperCY = (world.getMaxSectionY() + 1);
         int upperCZ = centerChunkPos.z() + radiusChunks;
         
         return from(world, lowerCX, upperCX, lowerCY, upperCY, lowerCZ, upperCZ);
@@ -61,7 +61,7 @@ public record FastBlockAccess(
         int lZ = upperCZExclusive - lowerCZ;
         
         int minSectionY = world.getMinSectionY();
-        int maxSectionYExclusive = world.getMaxSection();
+        int maxSectionYExclusive = (world.getMaxSectionY() + 1);
         Validate.isTrue(
             lowerCY >= minSectionY,
             "Min section Y out of range"

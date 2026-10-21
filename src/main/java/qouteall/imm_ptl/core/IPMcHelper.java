@@ -1,9 +1,9 @@
 package qouteall.imm_ptl.core;
 
-import com.mojang.renderpearl.backend.opengl.GlUtil;
 import io.netty.buffer.Unpooled;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -289,8 +289,7 @@ public class IPMcHelper {
         String command
     ) {
         return component.withStyle(
-            style -> style.withClickEvent(new ClickEvent(
-                ClickEvent.Action.RUN_COMMAND,
+            style -> style.withClickEvent(new ClickEvent.RunCommand(
                 command
             )).withUnderlined(true)
         );
@@ -312,7 +311,12 @@ public class IPMcHelper {
     
     @Environment(EnvType.CLIENT)
     public static boolean isNvidiaVideocard() {
-        return GlUtil.getVendor().toLowerCase().contains("nvidia");
+        //? if >=26.2 {
+        String vendor = RenderSystem.getDevice().getDeviceInfo().vendorName();
+        //?} else {
+        /*String vendor = RenderSystem.getDevice().getVendor();
+        *///?}
+        return vendor.toLowerCase().contains("nvidia");
     }
     
     public static FriendlyByteBuf bytesToBuf(byte[] packetBytes) {

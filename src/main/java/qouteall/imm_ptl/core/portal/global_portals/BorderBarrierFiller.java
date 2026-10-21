@@ -2,6 +2,7 @@ package qouteall.imm_ptl.core.portal.global_portals;
 
 import com.google.common.base.Supplier;
 import com.google.common.collect.Streams;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -138,7 +139,8 @@ public class BorderBarrierFiller {
                 ChunkAccess chunk = world.getChunk(columnPos);
                 for (int y = minY; y < maxYEx; y++) {
                     temp1.set(columnPos.getX(), y, columnPos.getZ());
-                    chunk.setBlockState(temp1, Blocks.AIR.defaultBlockState(), false);
+                    // 26.x: flags instead of isMoving; UPDATE_NEIGHBORS keeps the 1.21.1 server-side onRemove behaviour
+                    chunk.setBlockState(temp1, Blocks.AIR.defaultBlockState(), Block.UPDATE_NEIGHBORS);
                     lightingProvider.checkBlock(temp1);
                 }
                 

@@ -32,8 +32,7 @@ public class IPortalInitialScreen extends Screen {
         super(Component.empty());
         this.onClose = onClose;
         
-        this.minecraft = Minecraft.getInstance();
-        this.font = minecraft.font;
+        // 26.x: Screen sets the final minecraft and font fields in its constructor
         
         prevButton = Button.builder(
             Component.translatable("iportal.initial_screen.prev"),
@@ -59,7 +58,7 @@ public class IPortalInitialScreen extends Screen {
         titleWidget = new StringWidget(
             Component.translatable("iportal.initial_screen.title"),
             font
-        ).alignCenter();
+        ); // TODO port: StringWidget.alignCenter() is gone in 26.x (open UI question, text is left-aligned now)
         
         contentWidget = new MultiLineTextWidget(
             Component.empty(),
@@ -114,7 +113,7 @@ public class IPortalInitialScreen extends Screen {
         contentWidget.setMaxWidth(this.width - 40);
         pageNumberWidget.setWidth(50);
         pageNumberWidget.setHeight(iKnowButton.getHeight());
-        pageNumberWidget.alignCenter();
+        // TODO port: pageNumberWidget.alignCenter() is gone in 26.x (open UI question, text is left-aligned now)
         titleWidget.setHeight(iconWidget.getHeight());
         
         addRenderableWidget(prevButton);

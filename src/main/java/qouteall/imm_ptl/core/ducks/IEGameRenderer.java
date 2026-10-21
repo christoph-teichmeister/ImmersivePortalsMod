@@ -2,10 +2,11 @@ package qouteall.imm_ptl.core.ducks;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
-import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.Lightmap;
 
 public interface IEGameRenderer {
-    void ip_setLightmapTextureManager(LightTexture manager);
+    // 26.x: LightTexture became Lightmap (render port implements this in MixinGameRenderer)
+    void ip_setLightmapTextureManager(Lightmap manager);
     
     boolean ip_getDoRenderHand();
     
