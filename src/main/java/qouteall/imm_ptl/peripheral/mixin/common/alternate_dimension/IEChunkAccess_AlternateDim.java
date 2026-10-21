@@ -7,6 +7,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(ChunkAccess.class)
 public interface IEChunkAccess_AlternateDim {
-    @Accessor("noiseChunk")
+    // ChunkAccess.noiseChunk no longer exists in 26.3 (the NoiseChunk lives only inside buildTerrain)
+    //? if <26.3 {
+    /*@Accessor("noiseChunk")
     void ip_setNoiseChunk(NoiseChunk noiseChunk);
+    *///?}
 }

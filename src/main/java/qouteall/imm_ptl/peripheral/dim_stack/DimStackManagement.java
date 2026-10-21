@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.peripheral.dim_stack;
 
+import qouteall.imm_ptl.peripheral.IPOuterClientMisc;
 import net.minecraft.server.permissions.Permissions;
 import com.google.gson.JsonObject;
 import com.mojang.logging.LogUtils;
@@ -144,14 +145,14 @@ public class DimStackManagement {
             BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
-                    for (int y = chunk.getMinY(); y < chunk.getMaxBuildHeight(); y++) {
+                    for (int y = chunk.getMinY(); y <= chunk.getMaxY(); y++) {
                         mutable.set(x, y, z);
                         BlockState blockState = chunk.getBlockState(mutable);
                         if (blockState.getBlock() == Blocks.BEDROCK) {
                             chunk.setBlockState(
                                 mutable,
                                 replacement,
-                                false
+                                0 // was isMoving=false
                             );
                         }
                     }
@@ -168,7 +169,7 @@ public class DimStackManagement {
         Collection<ResourceKey<Level>> extra =
             DimensionStackAPI.DIMENSION_STACK_CANDIDATE_COLLECTION_EVENT
                 .invoker().getExtraDimensionKeys(
-                    server.registryAccess(), server.getWorldData().worldGenOptions()
+                    server.registryAccess(), server.getWorldGenSettings().options()
                 );
         
         result.addAll(extra);
@@ -210,11 +211,11 @@ public class DimStackManagement {
                             "qouteall.imm_ptl.peripheral.dim_stack.DimStackManagement.RemoteCallables.serverRemoveDimStack"
                         );
                     }
-                    Minecraft.getInstance().setScreen(null);
+                    IPOuterClientMisc.setScreen(null);
                 }
             );
             controller.initializeAsDefault();
-            Minecraft.getInstance().setScreen(controller.view);
+            IPOuterClientMisc.setScreen(controller.view);
         }
         
         public static void serverSetupDimStack(
@@ -234,13 +235,12 @@ public class DimStackManagement {
                 return;
             }
             
-            MinecraftServer server = player.getServer();
+            MinecraftServer server = player.level().getServer();
             
             updateDimStack(server, dimStackInfo);
             
-            player.displayClientMessage(
-                Component.translatable("imm_ptl.dim_stack_established"),
-                false
+            player.sendSystemMessage(
+                Component.translatable("imm_ptl.dim_stack_established")
             );
         }
         
@@ -252,13 +252,12 @@ public class DimStackManagement {
                 return;
             }
             
-            MinecraftServer server = player.getServer();
+            MinecraftServer server = player.level().getServer();
             
             clearDimStackPortals(server);
             
-            player.displayClientMessage(
-                Component.translatable("imm_ptl.dim_stack_removed"),
-                false
+            player.sendSystemMessage(
+                Component.translatable("imm_ptl.dim_stack_removed")
             );
             
             // on dedicated server, the preset should be consistent with the current dimension stack

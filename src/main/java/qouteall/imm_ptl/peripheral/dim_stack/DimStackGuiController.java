@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.peripheral.dim_stack;
 
+import qouteall.imm_ptl.peripheral.IPOuterClientMisc;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AlertScreen;
@@ -205,9 +206,9 @@ public class DimStackGuiController {
     }
     
     private void showConflictingAlert() {
-        Minecraft.getInstance().setScreen(new AlertScreen(
+        IPOuterClientMisc.setScreen(new AlertScreen(
             () -> {
-                Minecraft.getInstance().setScreen(view);
+                IPOuterClientMisc.setScreen(view);
             },
             Component.translatable("imm_ptl.conflicting_dim_stack")
                 .withStyle(ChatFormatting.RED),
@@ -247,9 +248,9 @@ public class DimStackGuiController {
         else {
             DimStackManagement.setDimStackPreset(model.getResult());
             
-            Minecraft.getInstance().setScreen(new AlertScreen(
+            IPOuterClientMisc.setScreen(new AlertScreen(
                 () -> {
-                    Minecraft.getInstance().setScreen(view);
+                    IPOuterClientMisc.setScreen(view);
                 },
                 Component.literal(""),
                 Component.translatable("imm_ptl.dim_stack_default_updated")

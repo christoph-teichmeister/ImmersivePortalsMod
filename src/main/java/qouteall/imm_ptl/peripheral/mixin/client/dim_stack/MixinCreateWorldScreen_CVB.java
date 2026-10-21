@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.peripheral.mixin.client.dim_stack;
 
+import qouteall.imm_ptl.peripheral.IPOuterClientMisc;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -75,13 +76,13 @@ public abstract class MixinCreateWorldScreen_CVB extends Screen implements IECre
                 () -> portal_getDimensionList(),
                 info -> {
                     DimStackManagement.dimStackToApply = info;
-                    Minecraft.getInstance().setScreen(this_);
+                    IPOuterClientMisc.setScreen(this_);
                 }
             );
             ip_dimStackController.initializeAsDefault();
         }
         
-        Minecraft.getInstance().setScreen(ip_dimStackController.view);
+        IPOuterClientMisc.setScreen(ip_dimStackController.view);
     }
     
     private List<ResourceKey<Level>> portal_getDimensionList() {

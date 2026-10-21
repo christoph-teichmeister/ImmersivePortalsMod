@@ -11,6 +11,9 @@ import net.minecraft.util.LinearCongruentialGenerator;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
+//? if >=26.3 {
+import net.minecraft.world.level.biome.BiomeResolver;
+//?}
 import org.jetbrains.annotations.NotNull;
 import qouteall.imm_ptl.core.McHelper;
 
@@ -133,9 +136,16 @@ public class ChaosBiomeSource extends BiomeSource {
         return allowedBiomes.stream();
     }
     
+    //? if >=26.3 {
     @Override
+    public BiomeResolver createResolver(Climate.Sampler sampler) {
+        return (x, y, z) -> getRandomBiome(x, z);
+    }
+    //?} else {
+    /*@Override
     public Holder<Biome> getNoiseBiome(int x, int y, int z, Climate.Sampler sampler) {
         return getRandomBiome(x, z);
     }
+    *///?}
     
 }
