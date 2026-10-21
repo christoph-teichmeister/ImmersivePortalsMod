@@ -207,9 +207,9 @@ public class FrontClipping {
             (float) viewSpacePlane[2], (float) viewSpacePlane[3]
         );
         //? if >=26.2 {
-        ObliqueProjection.apply(projection, plane, true);
+        ObliqueProjection.apply(projection, plane, true, GpuHelper.isZeroToOneDepth());
         //?} else {
-        /*ObliqueProjection.apply(projection, plane, false);
+        /*ObliqueProjection.apply(projection, plane, false, false);
         *///?}
     }
 }

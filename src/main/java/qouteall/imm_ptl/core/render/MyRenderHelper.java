@@ -75,7 +75,7 @@ public class MyRenderHelper {
         GpuHelper.drawScreenTriangles(
             GpuHelper.getMainTarget(),
             GpuHelper.getPositionColorPipeline(false, colorWriteMask, writeDepth, depthMode),
-            GpuHelper.FAR_NDC_Z,
+            GpuHelper.getFarNdcZ(),
             r, g, b, a
         );
     }

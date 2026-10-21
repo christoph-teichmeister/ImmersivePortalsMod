@@ -26,34 +26,47 @@ public class ObliqueProjectionTest {
         return reversedZ ? clip.w - clip.z : clip.z + clip.w;
     }
     
-    private static void check(boolean reversedZ) {
+    // the far plane condition: >= 0 means not clipped by the far plane
+    private static float farCondition(Vector4f clip, boolean reversedZ, boolean zeroToOne) {
+        if (reversedZ) {
+            return zeroToOne ? clip.z : clip.z + clip.w;
+        }
+        return clip.w - clip.z;
+    }
+    
+    private static void check(boolean reversedZ, boolean zeroToOne) {
+        // MC 26.2+ swaps near and far for reversed-Z
         Matrix4f projection = reversedZ ?
-            new Matrix4f().setPerspective((float) Math.toRadians(70), 16f / 9, FAR, NEAR, true) :
+            new Matrix4f().setPerspective((float) Math.toRadians(70), 16f / 9, FAR, NEAR, zeroToOne) :
             new Matrix4f().setPerspective((float) Math.toRadians(70), 16f / 9, NEAR, FAR, false);
         Vector4f plane = tiltedPlane();
         
-        assertTrue(ObliqueProjection.apply(projection, plane, reversedZ));
+        assertTrue(ObliqueProjection.apply(projection, plane, reversedZ, zeroToOne));
         
         Vector4f behindPlane = projection.transform(new Vector4f(0, 0, -2, 1));
         assertTrue(nearCondition(behindPlane, reversedZ) < 0, "between camera and plane is clipped");
         
         Vector4f beyondPlane = projection.transform(new Vector4f(0.5f, 0.2f, -20, 1));
         assertTrue(nearCondition(beyondPlane, reversedZ) > 0, "beyond the plane is kept");
-        float farCondition = reversedZ ? beyondPlane.z : beyondPlane.w - beyondPlane.z;
-        assertTrue(farCondition > 0, "beyond the plane is not clipped by the far plane");
+        assertTrue(farCondition(beyondPlane, reversedZ, zeroToOne) > 0, "beyond the plane is not clipped by the far plane");
         
         Vector4f onPlane = projection.transform(new Vector4f(0, 0, -3, 1));
         assertEquals(0, nearCondition(onPlane, reversedZ), 1e-3f, "the plane is the near plane");
     }
     
     @Test
-    void reversedZ() {
-        check(true);
+    void reversedZZeroToOne() {
+        check(true, true);
+    }
+    
+    @Test
+    void reversedZWithoutClipControl() {
+        check(true, false);
     }
     
     @Test
     void classicDepth() {
-        check(false);
+        check(false, false);
     }
     
     @Test
@@ -61,7 +74,7 @@ public class ObliqueProjectionTest {
         Matrix4f projection = new Matrix4f().setPerspective(1.2f, 1, FAR, NEAR, true);
         Matrix4f original = new Matrix4f(projection);
         // kept side is behind the camera, the frustum has no far corner on it
-        assertTrue(!ObliqueProjection.apply(projection, new Vector4f(0, 0, 1, -1), true));
+        assertTrue(!ObliqueProjection.apply(projection, new Vector4f(0, 0, 1, -1), true, true));
         assertEquals(original, projection);
     }
 }

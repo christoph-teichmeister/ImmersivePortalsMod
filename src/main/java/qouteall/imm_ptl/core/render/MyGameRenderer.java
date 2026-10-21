@@ -384,6 +384,9 @@ public class MyGameRenderer {
     /**
      * The portal version of GameRenderer.update + extract + renderLevel,
      * without the hand, screen effects and the post effects.
+     * TODO port: WorldRenderInfo.doRenderHand is ignored (1.21.1 rendered the hand when it was set, only the API used it).
+     * TODO port: the 1.21.1 cloud optimization (reusing the cloud mesh between portal views, CloudContext) is gone,
+     *  a portal view of the same dimension with another cloud cell makes the CloudRenderer rebuild its mesh.
      */
     private static void extractAndRenderLevel(NestedContext context, Camera camera) {
         IEGameRenderer_Accessor gameRendererAccess = (IEGameRenderer_Accessor) client.gameRenderer;

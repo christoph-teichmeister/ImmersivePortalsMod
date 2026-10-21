@@ -88,9 +88,28 @@ public final class GpuHelper {
     *///?}
 
     /**
-     * NDC z that maps to {@link #FAR_DEPTH}. In 26.1.x the clip range is [-1,1].
+     * Whether the NDC depth range is [0,1] (the OpenGL backend of 26.2+ uses glClipControl when it is supported).
      */
-    public static final float FAR_NDC_Z = (float) FAR_DEPTH;
+    public static boolean isZeroToOneDepth() {
+        //? if >=26.2 {
+        return RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
+        //?} else {
+        /*return RenderSystem.getDevice().isZZeroToOne();
+        *///?}
+    }
+    
+    /**
+     * NDC z that maps to {@link #FAR_DEPTH}.
+     * 26.1.x: classic depth in [-1,1], far is 1.
+     * 26.2+: reversed-Z, far is 0 in a [0,1] NDC range or -1 without clip control.
+     */
+    public static float getFarNdcZ() {
+        //? if >=26.2 {
+        return isZeroToOneDepth() ? 0 : -1;
+        //?} else {
+        /*return 1;
+        *///?}
+    }
 
     /**
      * The depth textures of the OpenGL backend get a stencil aspect, see MixinGlDevice_Stencil.
@@ -122,8 +141,7 @@ public final class GpuHelper {
 
     public static boolean isOpenGlBackend() {
         //? if >=26.2 {
-        String name = RenderSystem.getDevice().getDeviceInfo().backendName();
-        return name != null && name.toLowerCase().contains("gl");
+        return "OpenGL".equals(RenderSystem.getDevice().getDeviceInfo().backendName());
         //?} else {
         /*return true;
         *///?}

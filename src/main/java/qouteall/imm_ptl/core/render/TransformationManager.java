@@ -275,10 +275,15 @@ public class TransformationManager {
         m1.set(arr);
         
         //? if >=26.2 {
-        // 26.2+ uses reversed-Z with a [0,1] depth range: z' = (w - z) / 2
+        // 26.2+ uses reversed-Z: z' = (w - z) / 2 with a [0,1] depth range, z' = -z with [-1,1]
         org.joml.Vector4f row2 = m1.getRow(2, new org.joml.Vector4f());
         org.joml.Vector4f row3 = m1.getRow(3, new org.joml.Vector4f());
-        m1.setRow(2, row3.mul(0.5f).sub(row2.mul(0.5f)));
+        if (GpuHelper.isZeroToOneDepth()) {
+            m1.setRow(2, row3.mul(0.5f).sub(row2.mul(0.5f)));
+        }
+        else {
+            m1.setRow(2, row2.negate());
+        }
         //?}
         
         return m1;
