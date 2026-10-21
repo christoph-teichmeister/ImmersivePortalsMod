@@ -5,6 +5,7 @@ import com.mojang.logging.LogUtils;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -25,6 +26,15 @@ import java.io.IOException;
 @Environment(EnvType.CLIENT)
 public class IPOuterClientMisc {
     private static final Logger LOGGER = LogUtils.getLogger();
+    
+    // Minecraft.setScreen moved to Minecraft.gui in 26.2
+    public static void setScreen(@Nullable Screen screen) {
+        //? if >=26.2 {
+        Minecraft.getInstance().gui.setScreen(screen);
+        //?} else {
+        /*Minecraft.getInstance().setScreen(screen);
+        *///?}
+    }
     
     public static class OuterConfig {
         public boolean wikiInformed = false;

@@ -31,6 +31,12 @@ import qouteall.q_misc_util.Helper;
 
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+//? if >=26.3 {
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.level.biome.BiomeManager;
+import org.jetbrains.annotations.Nullable;
+import java.util.Set;
+//?}
 import java.util.concurrent.TimeUnit;
 
 public class ErrorTerrainGenerator extends DelegatedChunkGenerator {
@@ -98,8 +104,24 @@ public class ErrorTerrainGenerator extends DelegatedChunkGenerator {
         return MAP_CODEC;
     }
     
+    //? if >=26.3 {
     @Override
+    public @NotNull CompletableFuture<ChunkAccess> buildTerrain(
+        ChunkAccess chunkAccess, Blender blender, RandomState randomState, StructureManager structureManager,
+        BiomeManager biomeManager, @Nullable WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes
+    ) {
+        // TODO port: since 26.3 surface and carvers are private parts of NoiseBasedChunkGenerator.buildTerrain,
+        //  so the error terrain no longer gets the floating-island surface and carvers (1.21.1 delegated them)
+        return fillErrorTerrain(chunkAccess);
+    }
+    //?} else {
+    /*@Override
     public @NotNull CompletableFuture<ChunkAccess> fillFromNoise(Blender blender, RandomState randomState, StructureManager structureManager, ChunkAccess chunkAccess) {
+        return fillErrorTerrain(chunkAccess);
+    }
+    *///?}
+    
+    private CompletableFuture<ChunkAccess> fillErrorTerrain(ChunkAccess chunkAccess) {
         LevelChunkSection[] sectionArray = chunkAccess.getSections();
         ArrayList<LevelChunkSection> locked = new ArrayList<>();
         for (LevelChunkSection chunkSection : sectionArray) {

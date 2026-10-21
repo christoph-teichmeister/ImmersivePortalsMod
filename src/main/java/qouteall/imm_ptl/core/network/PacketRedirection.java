@@ -61,7 +61,7 @@ public class PacketRedirection {
         ThreadLocal.withInitial(() -> null);
     
     public static void init() {
-        PayloadTypeRegistry.playS2C().register(Payload.TYPE, Payload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(Payload.TYPE, Payload.CODEC);
     }
     
     public static void withForceRedirect(ServerLevel world, Runnable func) {

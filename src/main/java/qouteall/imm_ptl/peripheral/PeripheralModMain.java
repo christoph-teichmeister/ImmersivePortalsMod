@@ -3,8 +3,10 @@ package qouteall.imm_ptl.peripheral;
 import com.mojang.serialization.MapCodec;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
-import net.fabricmc.fabric.api.object.builder.v1.block.FabricBlockSettings;
+import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.BlockItem;
@@ -31,14 +33,25 @@ import java.util.function.BiConsumer;
 
 public class PeripheralModMain {
     
+    public static final Identifier PORTAL_HELPER_ID =
+        McHelper.newResourceLocation("immersive_portals", "portal_helper");
+    
+    // since 1.21.2 blocks and items need their registry id at construction
     public static final Block portalHelperBlock =
-        new Block(FabricBlockSettings.of().noOcclusion().isRedstoneConductor((a, b, c) -> false));
+        new Block(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, PORTAL_HELPER_ID))
+            .noOcclusion().isRedstoneConductor((a, b, c) -> false));
     
     public static final BlockItem portalHelperBlockItem =
-        new PortalHelperItem(PeripheralModMain.portalHelperBlock, new Item.Properties());
+        new PortalHelperItem(
+            PeripheralModMain.portalHelperBlock,
+            new Item.Properties()
+                .setId(ResourceKey.create(Registries.ITEM, PORTAL_HELPER_ID))
+                .useBlockDescriptionPrefix()
+        );
     
     public static final CreativeModeTab TAB =
-        FabricItemGroup.builder()
+        FabricCreativeModeTab.builder()
             .icon(() -> new ItemStack(PortalWandItem.instance))
             .title(Component.translatable("imm_ptl.item_group"))
             .displayItems((enabledFeatures, entries) -> {
@@ -81,10 +94,7 @@ public class PeripheralModMain {
     }
     
     public static void registerItems(BiConsumer<Identifier, Item> regFunc) {
-        regFunc.accept(
-            McHelper.newResourceLocation("immersive_portals", "portal_helper"),
-            portalHelperBlockItem
-        );
+        regFunc.accept(PORTAL_HELPER_ID, portalHelperBlockItem);
         
         regFunc.accept(
             McHelper.newResourceLocation("immersive_portals:command_stick"),
@@ -98,10 +108,7 @@ public class PeripheralModMain {
     }
     
     public static void registerBlocks(BiConsumer<Identifier, Block> regFunc) {
-        regFunc.accept(
-            McHelper.newResourceLocation("immersive_portals", "portal_helper"),
-            portalHelperBlock
-        );
+        regFunc.accept(PORTAL_HELPER_ID, portalHelperBlock);
     }
     
     public static void registerChunkGenerators(

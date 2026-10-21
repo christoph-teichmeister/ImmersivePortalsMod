@@ -10,7 +10,9 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.WorldGenRegion;
-import net.minecraft.util.random.WeightedRandomList;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.Level;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.NoiseColumn;
@@ -24,7 +26,6 @@ import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
-import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.blending.Blender;
@@ -37,6 +38,10 @@ import qouteall.imm_ptl.core.miscellaneous.IPVanillaCopy;
 
 import java.util.List;
 import java.util.Optional;
+//? if >=26.3 {
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+import java.util.Set;
+//?}
 import java.util.concurrent.CompletableFuture;
 
 @IPVanillaCopy
@@ -54,15 +59,33 @@ public abstract class DelegatedChunkGenerator extends ChunkGenerator {
         this.biomeSource_ = biomeSource;
     }
     
+    // since 26.3 noise filling, surface and carvers are one step (buildTerrain)
+    //? if >=26.3 {
     @Override
-    public void applyCarvers(WorldGenRegion worldGenRegion, long l, RandomState randomState, BiomeManager biomeManager, StructureManager structureManager, ChunkAccess chunkAccess, GenerationStep.Carving carving) {
-        delegate.applyCarvers(worldGenRegion, l, randomState, biomeManager, structureManager, chunkAccess, carving);
+    public @NotNull CompletableFuture<ChunkAccess> buildTerrain(
+        ChunkAccess chunk, Blender blender, RandomState randomState, StructureManager structureManager,
+        BiomeManager biomeManager, @Nullable WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes
+    ) {
+        return delegate.buildTerrain(
+            chunk, blender, randomState, structureManager, biomeManager, carverBiomeRegion, possibleBiomes
+        );
+    }
+    //?} else {
+    /*@Override
+    public void applyCarvers(WorldGenRegion worldGenRegion, long l, RandomState randomState, BiomeManager biomeManager, StructureManager structureManager, ChunkAccess chunkAccess) {
+        delegate.applyCarvers(worldGenRegion, l, randomState, biomeManager, structureManager, chunkAccess);
     }
     
     @Override
     public void buildSurface(WorldGenRegion worldGenRegion, StructureManager structureManager, RandomState randomState, ChunkAccess chunkAccess) {
         delegate.buildSurface(worldGenRegion, structureManager, randomState, chunkAccess);
     }
+    
+    @Override
+    public @NotNull CompletableFuture<ChunkAccess> fillFromNoise(Blender blender, RandomState randomState, StructureManager structureManager, ChunkAccess chunkAccess) {
+        return delegate.fillFromNoise(blender, randomState, structureManager, chunkAccess);
+    }
+    *///?}
     
     @Override
     public void spawnOriginalMobs(WorldGenRegion region) {
@@ -72,11 +95,6 @@ public abstract class DelegatedChunkGenerator extends ChunkGenerator {
     @Override
     public int getGenDepth() {
         return delegate.getGenDepth();
-    }
-    
-    @Override
-    public @NotNull CompletableFuture<ChunkAccess> fillFromNoise(Blender blender, RandomState randomState, StructureManager structureManager, ChunkAccess chunkAccess) {
-        return delegate.fillFromNoise(blender, randomState, structureManager, chunkAccess);
     }
     
     @Override
@@ -99,10 +117,17 @@ public abstract class DelegatedChunkGenerator extends ChunkGenerator {
         return delegate.getBaseColumn(i, j, levelHeightAccessor, randomState);
     }
     
+    //? if >=26.3 {
     @Override
+    public void addDebugScreenInfo(List<String> list, RandomState randomState, BlockPos blockPos, SamplerContext samplerContext) {
+        delegate.addDebugScreenInfo(list, randomState, blockPos, samplerContext);
+    }
+    //?} else {
+    /*@Override
     public void addDebugScreenInfo(List<String> list, RandomState randomState, BlockPos blockPos) {
         delegate.addDebugScreenInfo(list, randomState, blockPos);
     }
+    *///?}
     
     @Override
     public ChunkGeneratorStructureState createState(HolderLookup<StructureSet> holderLookup, RandomState randomState, long l) {
@@ -115,8 +140,8 @@ public abstract class DelegatedChunkGenerator extends ChunkGenerator {
     }
     
     @Override
-    public void createStructures(RegistryAccess registryAccess, ChunkGeneratorStructureState chunkGeneratorStructureState, StructureManager structureManager, ChunkAccess chunkAccess, StructureTemplateManager structureTemplateManager) {
-        super.createStructures(registryAccess, chunkGeneratorStructureState, structureManager, chunkAccess, structureTemplateManager);
+    public void createStructures(RegistryAccess registryAccess, ChunkGeneratorStructureState chunkGeneratorStructureState, StructureManager structureManager, ChunkAccess chunkAccess, StructureTemplateManager structureTemplateManager, ResourceKey<Level> level) {
+        super.createStructures(registryAccess, chunkGeneratorStructureState, structureManager, chunkAccess, structureTemplateManager, level);
     }
     
     @Override
@@ -125,7 +150,7 @@ public abstract class DelegatedChunkGenerator extends ChunkGenerator {
     }
     
     @Override
-    public Optional<ResourceKey<MapCodec<? extends ChunkGenerator>>> getTypeNameForDataFixer() {
+    public Optional<Identifier> getTypeNameForDataFixer() {
         return delegate.getTypeNameForDataFixer();
     }
     
@@ -145,10 +170,17 @@ public abstract class DelegatedChunkGenerator extends ChunkGenerator {
         return delegate.getBiomeSource();
     }
     
+    //? if >=26.3 {
     @Override
-    public WeightedRandomList<MobSpawnSettings.SpawnerData> getMobsAt(Holder<Biome> holder, StructureManager structureManager, MobCategory mobCategory, BlockPos blockPos) {
+    public WeightedList<MobSpawnSettings.SpawnerData> getMobsAt(Level level, StructureManager structureManager, MobCategory mobCategory, BlockPos blockPos) {
+        return delegate.getMobsAt(level, structureManager, mobCategory, blockPos);
+    }
+    //?} else {
+    /*@Override
+    public WeightedList<MobSpawnSettings.SpawnerData> getMobsAt(Holder<Biome> holder, StructureManager structureManager, MobCategory mobCategory, BlockPos blockPos) {
         return delegate.getMobsAt(holder, structureManager, mobCategory, blockPos);
     }
+    *///?}
     
     @Override
     public void createReferences(WorldGenLevel worldGenLevel, StructureManager structureManager, ChunkAccess chunkAccess) {

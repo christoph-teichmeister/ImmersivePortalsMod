@@ -1,5 +1,10 @@
 package qouteall.imm_ptl.core.commands;
 
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.server.permissions.Permissions;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
@@ -126,7 +131,7 @@ public class PortalCommand {
         
         LiteralArgumentBuilder<CommandSourceStack> global =
             Commands.literal("global")
-                .requires(commandSource -> commandSource.hasPermission(2));
+                .requires(commandSource -> commandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER));
         registerGlobalPortalCommands(global);
         builder.then(global);
         
@@ -153,7 +158,7 @@ public class PortalCommand {
             }
         }
         
-        return commandSource.hasPermission(2);
+        return commandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
     }
     
     private static void registerGlobalPortalCommands(
@@ -429,7 +434,7 @@ public class PortalCommand {
                 .executes(context -> processPortalTargetedCommand(
                     context,
                     portal -> {
-                        Component name = ComponentArgument.getComponent(context, "name");
+                        Component name = ComponentArgument.getRawComponent(context, "name");
                         portal.setCustomName(name);
                     }
                 ))
@@ -609,7 +614,7 @@ public class PortalCommand {
                             
                             ServerPlayer player = context.getSource().getPlayerOrException();
                             Vec3 viewVector = player.getLookAngle();
-                            Direction facing = Direction.getNearest(
+                            Direction facing = Direction.getApproximateNearest(
                                 viewVector.x, viewVector.y, viewVector.z
                             );
                             Vec3 offset = Vec3.atLowerCornerOf(facing.getUnitVec3i()).scale(distance);
@@ -640,7 +645,7 @@ public class PortalCommand {
                             
                             ServerPlayer player = context.getSource().getPlayerOrException();
                             Vec3 viewVector = player.getLookAngle();
-                            Direction facing = Direction.getNearest(
+                            Direction facing = Direction.getApproximateNearest(
                                 viewVector.x, viewVector.y, viewVector.z
                             );
                             Vec3 offset = Vec3.atLowerCornerOf(facing.getUnitVec3i()).scale(distance);
@@ -899,7 +904,7 @@ public class PortalCommand {
         );
         
         builder.then(Commands.literal("add_command_on_teleported")
-            .requires(serverCommandSource -> serverCommandSource.hasPermission(2))
+            .requires(serverCommandSource -> serverCommandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.argument("subCommand", SubCommandArgumentType.instance)
                 .executes(context -> processPortalTargetedCommand(context, portal -> {
                     String subCommand = SubCommandArgumentType.get(context, "subCommand");
@@ -914,7 +919,7 @@ public class PortalCommand {
         );
         
         builder.then(Commands.literal("remove_command_on_teleported_at")
-            .requires(serverCommandSource -> serverCommandSource.hasPermission(2))
+            .requires(serverCommandSource -> serverCommandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.argument("indexStartingFromZero", IntegerArgumentType.integer(0, 100))
                 .executes(context -> processPortalTargetedCommand(context, portal -> {
                     if (portal.getCommandsOnTeleported() == null) {
@@ -938,7 +943,7 @@ public class PortalCommand {
         // The code of command "set_command_on_teleported_at" is fully written by GitHub Copilot!!!!!!!!
         // The AI is so smart!!!!
         builder.then(Commands.literal("set_command_on_teleported_at")
-            .requires(serverCommandSource -> serverCommandSource.hasPermission(2))
+            .requires(serverCommandSource -> serverCommandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.argument("indexStartingFromZero", IntegerArgumentType.integer(0, 100))
                 .then(Commands.argument("subCommand", SubCommandArgumentType.instance)
                     .executes(context -> processPortalTargetedCommand(context, portal -> {
@@ -964,7 +969,7 @@ public class PortalCommand {
         );
         
         builder.then(Commands.literal("clear_commands_on_teleported")
-            .requires(serverCommandSource -> serverCommandSource.hasPermission(2))
+            .requires(serverCommandSource -> serverCommandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .executes(context -> processPortalTargetedCommand(context, portal -> {
                 portal.setCommandsOnTeleported(null);
                 portal.reloadAndSyncToClient();
@@ -1061,7 +1066,7 @@ public class PortalCommand {
         Portal portal, CompoundTag newNbt
     ) {
         if (newNbt.contains("commandsOnTeleported")) {
-            if (!context.getSource().hasPermission(2)) {
+            if (!context.getSource().permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                 context.getSource().sendFailure(Component.literal(
                     "You do not have the permission to set commandsOnTeleported"
                 ));
@@ -1089,7 +1094,7 @@ public class PortalCommand {
         BlockPos origin = BlockPos.containing(portal.getOriginPos());
         
         Direction portalNormalDirection =
-            Direction.getNearest(portal.getNormal().x, portal.getNormal().y, portal.getNormal().z);
+            Direction.getApproximateNearest(portal.getNormal().x, portal.getNormal().y, portal.getNormal().z);
         
         Level world = portal.level();
         
@@ -1241,7 +1246,7 @@ public class PortalCommand {
         double width, double height, Entity fromEntity, Entity toEntity,
         String portalName
     ) {
-        Portal portal = Portal.ENTITY_TYPE.create(fromEntity.level());
+        Portal portal = Portal.ENTITY_TYPE.create(fromEntity.level(), EntitySpawnReason.COMMAND);
         
         portal.setPos(fromEntity.getX(), fromEntity.getY(), fromEntity.getZ());
         
@@ -1340,7 +1345,7 @@ public class PortalCommand {
         );
         
         builder.then(Commands.literal("tp")
-            .requires(commandSource -> commandSource.hasPermission(2))
+            .requires(commandSource -> commandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.argument("from", EntityArgument.entities())
                 .then(Commands.argument("to", EntityArgument.entity())
                     .executes(context -> {
@@ -1553,7 +1558,7 @@ public class PortalCommand {
                                 double thisSideHeight = area.getYsize() / scale;
                                 double thisSideThickness = area.getZsize() / scale;
                                 
-                                Portal portal = Portal.ENTITY_TYPE.create(boxWorld);
+                                Portal portal = Portal.ENTITY_TYPE.create(boxWorld, EntitySpawnReason.COMMAND);
                                 assert portal != null;
                                 portal.setDestinationDimension(areaWorld.dimension());
                                 portal.setOriginPos(
@@ -1792,7 +1797,7 @@ public class PortalCommand {
                             
                             Vec3 center = fromPos.add(toPos).scale(0.5);
                             
-                            Portal portal = Portal.ENTITY_TYPE.create(context.getSource().getLevel());
+                            Portal portal = Portal.ENTITY_TYPE.create(context.getSource().getLevel(), EntitySpawnReason.COMMAND);
                             assert portal != null;
                             portal.setOriginPos(center);
                             portal.setOrientation(vecAlongAxis.normalize(), vecNotAlongAxis.normalize());
@@ -1820,7 +1825,7 @@ public class PortalCommand {
         
         builder.then(Commands
             .literal("dimension_stack")
-            .requires(commandSource -> commandSource.hasPermission(2))
+            .requires(commandSource -> commandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .executes(context -> {
                 ServerPlayer player = context.getSource().getPlayerOrException();
                 
@@ -1842,7 +1847,7 @@ public class PortalCommand {
         
         builder.then(Commands
             .literal("create_command_stick")
-            .requires(serverCommandSource -> serverCommandSource.hasPermission(2))
+            .requires(serverCommandSource -> serverCommandSource.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.argument("command", SubCommandArgumentType.instance)
                 .executes(context -> {
                     PortalCommand.createCommandStickCommandSignal.emit(
@@ -1880,7 +1885,7 @@ public class PortalCommand {
                     facingVec, sideDirectionVec
                 );
                 
-                Portal portal = Portal.ENTITY_TYPE.create(world);
+                Portal portal = Portal.ENTITY_TYPE.create(world, EntitySpawnReason.COMMAND);
                 portal.setOriginPos(portalOrigin);
                 portal.setDestination(portalDestination);
                 portal.setDestinationDimension(world.dimension());
@@ -1942,7 +1947,7 @@ public class PortalCommand {
                     IntBox room1 = room1Area.getAdjusted(1, 1, 1, -1, -1, -1);
                     IntBox room2 = room2Area.getAdjusted(1, 1, 1, -1, -1, -1);
                     
-                    Portal portal = Portal.ENTITY_TYPE.create(world);
+                    Portal portal = Portal.ENTITY_TYPE.create(world, EntitySpawnReason.COMMAND);
                     Validate.notNull(portal);
                     portal.setOriginPos(room1.getCenterVec().add(
                         roomSize.getX() / 4.0, 0, 0
@@ -2027,7 +2032,7 @@ public class PortalCommand {
     
     private static void addSmallWorldWrappingPortals(AABB box, ServerLevel world, boolean isInward) {
         for (Direction direction : Direction.values()) {
-            Portal portal = Portal.ENTITY_TYPE.create(world);
+            Portal portal = Portal.ENTITY_TYPE.create(world, EntitySpawnReason.COMMAND);
             WorldWrappingPortal.initWrappingPortal(
                 world, box, direction, isInward, portal
             );
@@ -2238,7 +2243,7 @@ public class PortalCommand {
     public static void sendPortalInfo(Consumer<Component> func, Portal portal) {
         func.accept(
             McHelper.compoundTagToTextSorted(
-                portal.saveWithoutId(new CompoundTag()),
+                saveEntityWithoutId(portal),
                 " ",
                 0
             )
@@ -2448,14 +2453,20 @@ public class PortalCommand {
     private static void updateEntityFullNbt(Entity entity, CompoundTag nbt) {
         nbt.remove("id");
         nbt.remove("UUID"); // not allowed to change UUID
-        CompoundTag result = entity.saveWithoutId(new CompoundTag());
+        CompoundTag result = saveEntityWithoutId(entity);
         result.merge(nbt);
-        entity.load(result);
+        entity.load(TagValueInput.create(ProblemReporter.DISCARDING, entity.registryAccess(), result));
+    }
+    
+    private static CompoundTag saveEntityWithoutId(Entity entity) {
+        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, entity.registryAccess());
+        entity.saveWithoutId(output);
+        return output.buildResult();
     }
     
     private static void registerEulerCommands(LiteralArgumentBuilder<CommandSourceStack> builder) {
         builder.then(Commands.literal("make_portal")
-            .requires(s -> s.hasPermission(2))
+            .requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.argument("origin", Vec3Argument.vec3(false))
                 .then(Commands.argument("rotation", RotationArgument.rotation())
                     .then(Commands.argument("width", DoubleArgumentType.doubleArg(0))
@@ -2474,7 +2485,7 @@ public class PortalCommand {
                                         
                                         ServerLevel world = context.getSource().getLevel();
                                         
-                                        Portal portal = Portal.ENTITY_TYPE.create(world);
+                                        Portal portal = Portal.ENTITY_TYPE.create(world, EntitySpawnReason.COMMAND);
                                         Validate.notNull(portal);
                                         portal.setOriginPos(origin);
                                         
@@ -2525,7 +2536,7 @@ public class PortalCommand {
         );
         
         builder.then(Commands.literal("set_this_side")
-            .requires(s -> s.hasPermission(2))
+            .requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
             .then(Commands.argument("origin", Vec3Argument.vec3(false))
                 .then(Commands.argument("rotation", RotationArgument.rotation())
                     .then(Commands.argument("width", DoubleArgumentType.doubleArg(0))
@@ -2621,7 +2632,7 @@ public class PortalCommand {
         portal.remove(Entity.RemovalReason.KILLED);
         
         // create the 2 mirrors
-        Mirror thisSideMirror = Mirror.ENTITY_TYPE.create(fromWorld);
+        Mirror thisSideMirror = Mirror.ENTITY_TYPE.create(fromWorld, EntitySpawnReason.COMMAND);
         assert thisSideMirror != null;
         thisSideMirror.setDestDim(thisSideMirror.level().dimension());
         thisSideMirror.setOriginPos(thisSideState.position());
@@ -2632,7 +2643,7 @@ public class PortalCommand {
         thisSideMirror.setPortalShape(specialShape);
         thisSideMirror.setRotationTransformationForMirror(spacialRotation);
         
-        Mirror otherSideMirror = Mirror.ENTITY_TYPE.create(toWorld);
+        Mirror otherSideMirror = Mirror.ENTITY_TYPE.create(toWorld, EntitySpawnReason.COMMAND);
         assert otherSideMirror != null;
         otherSideMirror.setDestDim(otherSideMirror.level().dimension());
         otherSideMirror.setOriginPos(otherSideState.position());
@@ -2647,7 +2658,7 @@ public class PortalCommand {
         McHelper.spawnServerEntity(otherSideMirror);
         
         // create the invisible portal
-        Portal invisiblePortal = Portal.ENTITY_TYPE.create(fromWorld);
+        Portal invisiblePortal = Portal.ENTITY_TYPE.create(fromWorld, EntitySpawnReason.COMMAND);
         assert invisiblePortal != null;
         invisiblePortal.setDestDim(toWorld.dimension());
         invisiblePortal.setPortalState(UnilateralPortalState.combine(thisSideState, otherSideState));

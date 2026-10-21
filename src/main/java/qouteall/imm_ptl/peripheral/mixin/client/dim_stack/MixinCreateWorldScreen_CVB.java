@@ -1,7 +1,9 @@
 package qouteall.imm_ptl.peripheral.mixin.client.dim_stack;
 
+import qouteall.imm_ptl.peripheral.IPOuterClientMisc;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldCallback;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationContext;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
@@ -57,8 +59,9 @@ public abstract class MixinCreateWorldScreen_CVB extends Screen implements IECre
         at = @At("RETURN")
     )
     private void onInitEnd(
-        Minecraft minecraft, Screen screen, WorldCreationContext worldCreationContext,
-        Optional<ResourceKey<WorldPreset>> optional, OptionalLong optionalLong, CallbackInfo ci
+        Minecraft minecraft, Runnable onClose, WorldCreationContext worldCreationContext,
+        Optional<ResourceKey<WorldPreset>> optional, OptionalLong optionalLong,
+        CreateWorldCallback createWorldCallback, CallbackInfo ci
     ) {
         DimStackManagement.dimStackToApply = DimStackManagement.getDimStackPreset();
         if (DimStackManagement.dimStackToApply != null) {
@@ -75,13 +78,13 @@ public abstract class MixinCreateWorldScreen_CVB extends Screen implements IECre
                 () -> portal_getDimensionList(),
                 info -> {
                     DimStackManagement.dimStackToApply = info;
-                    Minecraft.getInstance().setScreen(this_);
+                    IPOuterClientMisc.setScreen(this_);
                 }
             );
             ip_dimStackController.initializeAsDefault();
         }
         
-        Minecraft.getInstance().setScreen(ip_dimStackController.view);
+        IPOuterClientMisc.setScreen(ip_dimStackController.view);
     }
     
     private List<ResourceKey<Level>> portal_getDimensionList() {
