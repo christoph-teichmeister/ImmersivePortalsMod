@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.core.render.context_management;
 
+import qouteall.imm_ptl.core.render.MyGameRenderer;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -89,7 +90,7 @@ public class RenderStates {
     ) {
         ClientWorldLoader.initializeIfNeeded();
         
-        Entity cameraEntity = MyRenderHelper.client.cameraEntity;
+        Entity cameraEntity = MyRenderHelper.client.getCameraEntity();
         
         if (cameraEntity == null) {
             return;
@@ -114,7 +115,7 @@ public class RenderStates {
         updateViewBobbingFactor(cameraEntity);
         
         basicProjectionMatrix = null;
-        originalCamera = MyRenderHelper.client.gameRenderer.getMainCamera();
+        originalCamera = MyGameRenderer.getMainCamera();
         
         updateIsLaggy();
         
@@ -145,10 +146,17 @@ public class RenderStates {
         else {
             if (lastPortalRenderInfos.size() > 10) {
                 if (ClientPerformanceMonitor.getAverageFps() < 8 || ClientPerformanceMonitor.getMinimumFps() < 6) {
-                    MyRenderHelper.client.gui.setOverlayMessage(
+                    //? if >=26.2 {
+                    MyRenderHelper.client.gui.hud.setOverlayMessage(
                         Component.translatable("imm_ptl.laggy"),
                         false
                     );
+                    //?} else {
+                    /*MyRenderHelper.client.gui.setOverlayMessage(
+                        Component.translatable("imm_ptl.laggy"),
+                        false
+                    );
+                    *///?}
                     isLaggy = true;
                 }
             }
@@ -210,7 +218,7 @@ public class RenderStates {
         gameRenderer.ip_setLightmapTextureManager(ClientWorldLoader
             .getDimensionRenderHelper(client.level.dimension()).lightmapTexture);
         
-        Vec3 currCameraPos = client.gameRenderer.getMainCamera().getPosition();
+        Vec3 currCameraPos = MyGameRenderer.getMainCamera().position();
         cameraPosDelta = currCameraPos.subtract(lastCameraPos);
         if (cameraPosDelta.lengthSqr() > 1) {
             cameraPosDelta = Vec3.ZERO;

@@ -35,7 +35,14 @@ public class MixinSectionRenderDispatcher {
         )
     )
     private SectionBufferBuilderPool redirectSectionBufferBuilderPool(RenderBuffers instance) {
-        if (ClientWorldLoader.getIsCreatingClientWorld()
+        // 26.2+: the dispatcher is created lazily by the level extraction, not when IP creates the client world,
+        // so every dispatcher gets its own pool
+        //? if >=26.2 {
+        boolean useOwnPool = true;
+        //?} else {
+        /*boolean useOwnPool = ClientWorldLoader.getIsCreatingClientWorld();
+        *///?}
+        if (useOwnPool
             && !SodiumInterface.invoker.isSodiumPresent()
         ) {
             int processors = Runtime.getRuntime().availableProcessors();

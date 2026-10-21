@@ -8,13 +8,12 @@ import qouteall.imm_ptl.core.render.ForceMainThreadRebuild;
 
 @Mixin(LevelRenderer.class)
 public class MixinLevelRenderer_ForceMainThreadRebuild {
+    // the second boolean local of compileSections is "rebuildSync" (the first is "isNearby"),
+    // it is only loaded once, in "if (rebuildSync)"
     @ModifyVariable(
         method = "compileSections",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/client/Options;prioritizeChunkUpdates()Lnet/minecraft/client/OptionInstance;",
-            ordinal = 0
-        )
+        at = @At("LOAD"),
+        ordinal = 1
     )
     private boolean modifyShouldImmediatelyRebuild(boolean originalValue) {
         if (ForceMainThreadRebuild.isCurrentFrameForceMainThreadRebuild()) {

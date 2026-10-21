@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.core.mixin.client.sound;
 
+import qouteall.imm_ptl.core.render.MyGameRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -65,7 +66,7 @@ public class MixinClientLevel_Sound {
     }
     
     private void portal_playSound(SimpleSoundInstance sound, boolean distanceDelay) {
-        double d = minecraft.gameRenderer.getMainCamera().getPosition().distanceToSqr(sound.getX(), sound.getY(), sound.getZ());
+        double d = MyGameRenderer.getMainCamera().position().distanceToSqr(sound.getX(), sound.getY(), sound.getZ());
         if (distanceDelay && d > 100.0D) {
             double e = Math.sqrt(d) / 40.0D;
             minecraft.getSoundManager().playDelayed(sound, (int) (e * 20.0D));

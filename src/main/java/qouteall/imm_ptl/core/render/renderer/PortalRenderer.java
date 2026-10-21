@@ -1,11 +1,8 @@
 package qouteall.imm_ptl.core.render.renderer;
 
-import com.mojang.renderpearl.backend.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
-import net.minecraft.client.GraphicsStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -23,6 +20,7 @@ import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.portal.Mirror;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.global_portals.GlobalPortalStorage;
+import qouteall.imm_ptl.core.render.GpuHelper;
 import qouteall.imm_ptl.core.render.MyGameRenderer;
 import qouteall.imm_ptl.core.render.MyRenderHelper;
 import qouteall.imm_ptl.core.render.TransformationManager;
@@ -57,6 +55,10 @@ public abstract class PortalRenderer {
     
     public static final Minecraft client = Minecraft.getInstance();
     
+    /**
+     * Called inside the level rendering after the solid things and before the translucent things,
+     * outside of any open render pass. The model view is the camera rotation.
+     */
     public abstract void onBeforeTranslucentRendering(Matrix4f modelView);
     
     public abstract void onAfterTranslucentRendering(Matrix4f modelView);
@@ -81,17 +83,11 @@ public abstract class PortalRenderer {
     public abstract boolean replaceFrameBufferClearing();
     
     protected List<Portal> getPortalsToRender(Matrix4f modelView) {
-        Supplier<Frustum> frustumSupplier = Helper.cached(() -> {
-            Frustum frustum = new Frustum(
-                modelView,
-                RenderSystem.getProjectionMatrix()
-            );
-            
-            Vec3 cameraPos = client.gameRenderer.getMainCamera().getPosition();
-            frustum.prepare(cameraPos.x, cameraPos.y, cameraPos.z);
-            
-            return frustum;
-        });
+        // 26.x: the projection matrix only lives in a GPU buffer, use the culling frustum of the current camera
+        // (in portal rendering the main camera is the portal view camera)
+        Supplier<Frustum> frustumSupplier = Helper.cached(
+            () -> new Frustum(MyGameRenderer.getMainCamera().getCullFrustum())
+        );
         
         ObjectArrayList<Portal> renderables = new ObjectArrayList<>();
         
@@ -221,12 +217,6 @@ public abstract class PortalRenderer {
         );
         
         PortalRendering.onEndPortalWorldRendering();
-        
-        GlStateManager._enableDepthTest();
-        
-        MyRenderHelper.restoreViewPort();
-        
-        
     }
     
     private static int getPortalRenderDistance(Portal portal) {
@@ -305,6 +295,7 @@ public abstract class PortalRenderer {
     public void onBeginIrisTranslucentRendering(Matrix4f modelView) {}
     
     private static boolean fabulousWarned = false;
+    private static boolean nonGlBackendWarned = false;
     
     public static void switchToCorrectRenderer() {
         if (PortalRendering.isRendering()) {
@@ -312,7 +303,8 @@ public abstract class PortalRenderer {
             return;
         }
         
-        if (Minecraft.getInstance().options.graphicsMode().get() == GraphicsStatus.FABULOUS) {
+        // 26.x "improved transparency" replaced the fabulous graphics mode
+        if (Minecraft.getInstance().options.improvedTransparency().get()) {
             if (!fabulousWarned) {
                 fabulousWarned = true;
                 CHelper.printChat(Component.translatable("imm_ptl.fabulous_warning"));
@@ -322,6 +314,17 @@ public abstract class PortalRenderer {
         IPModInfoChecking.checkShaderpack();
         
         // TODO Sodium/Iris compat port: Iris portal renderer selection removed
+        
+        // TODO port: the portal renderers use raw OpenGL stencil/clip state,
+        //  which does not exist on the Vulkan backend (26.2+). Portals are not rendered there.
+        if (!GpuHelper.isOpenGlBackend()) {
+            if (!nonGlBackendWarned) {
+                nonGlBackendWarned = true;
+                Helper.err("Immersive Portals portal rendering requires the OpenGL backend");
+            }
+            switchRenderer(IPCGlobal.rendererDummy);
+            return;
+        }
         
         switch (IPGlobal.renderMode) {
             case normal -> switchRenderer(IPCGlobal.rendererUsingStencil);

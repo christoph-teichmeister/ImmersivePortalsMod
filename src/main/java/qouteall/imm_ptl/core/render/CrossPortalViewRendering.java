@@ -31,21 +31,12 @@ public class CrossPortalViewRendering {
             return false;
         }
         
-        Entity cameraEntity = client.cameraEntity;
+        Entity cameraEntity = client.getCameraEntity();
         
-        Camera camera1 = new Camera();
-        float cameraY = ((IECamera) RenderStates.originalCamera).ip_getCameraY();
-        float lastCameraY = ((IECamera) RenderStates.originalCamera).ip_getLastCameraY();
-        ((IECamera) camera1).ip_setCameraY(cameraY, lastCameraY);
-        Camera camera = camera1;
-        camera.setup(
-            client.level, cameraEntity,
-            isThirdPerson(),
-            isFrontView(),
-            RenderStates.getPartialTick()
-        );
+        // 26.x: the main camera is already updated for this frame (GameRenderer.update runs before rendering)
+        Camera camera = RenderStates.originalCamera;
     
-        Vec3 realCameraPos = camera.getPosition();
+        Vec3 realCameraPos = camera.position();
         Vec3 isometricAdjustedOriginalCameraPos =
             TransformationManager.getIsometricAdjustedCameraPos(camera);
         
@@ -113,14 +104,14 @@ public class CrossPortalViewRendering {
     private static Vec3 getThirdPersonCameraPos(Vec3 endPos, Portal portal, Vec3 startPos) {
         Vec3 rtStart = portal.transformPoint(startPos);
         Vec3 rtEnd = portal.transformPoint(endPos);
-        assert client.cameraEntity != null;
+        assert client.getCameraEntity() != null;
         BlockHitResult blockHitResult = portal.getDestinationWorld().clip(
             new ClipContext(
                 rtStart,
                 rtEnd,
                 ClipContext.Block.VISUAL,
                 ClipContext.Fluid.NONE,
-                client.cameraEntity
+                client.getCameraEntity()
             )
         );
         
@@ -139,13 +130,13 @@ public class CrossPortalViewRendering {
     
     //    private static Vec3d getThirdPersonCameraPos(Portal portalHit, Camera resuableCamera) {
 //        return CHelper.withWorldSwitched(
-//            client.cameraEntity,
+//            client.getCameraEntity(),
 //            portalHit,
 //            () -> {
 //                World destinationWorld = portalHit.getDestinationWorld();
 //                resuableCamera.update(
 //                    destinationWorld,
-//                    client.cameraEntity,
+//                    client.getCameraEntity(),
 //                    true,
 //                    isInverseView(),
 //                    RenderStates.tickDelta

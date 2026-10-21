@@ -59,10 +59,17 @@ public abstract class MixinClientLevel implements IEClientWorld {
     @Final
     private Minecraft minecraft;
     
+    //? if >=26.2 {
     @Mutable
     @Shadow
     @Final
+    private net.minecraft.client.renderer.extract.LevelExtractor levelExtractor;
+    //?} else {
+    /*@Mutable
+    @Shadow
+    @Final
     private LevelRenderer levelRenderer;
+    *///?}
     
     @Shadow
     @Final
@@ -98,11 +105,21 @@ public abstract class MixinClientLevel implements IEClientWorld {
         method = "<init>",
         at = @At("RETURN")
     )
+    //? if >=26.2 {
     void onConstructed(
         ClientPacketListener clientPacketListener, ClientLevel.ClientLevelData clientLevelData,
-        ResourceKey resourceKey, Holder holder, int loadDistance, int j, Supplier supplier,
-        LevelRenderer levelRenderer, boolean bl, long l, CallbackInfo ci
+        ResourceKey resourceKey, Holder holder, int loadDistance, int simulationDistance,
+        net.minecraft.client.renderer.extract.LevelExtractor levelExtractor, boolean isDebug, long biomeZoomSeed,
+        int seaLevel, CallbackInfo ci
     ) {
+    //?} else {
+    /*void onConstructed(
+        ClientPacketListener clientPacketListener, ClientLevel.ClientLevelData clientLevelData,
+        ResourceKey resourceKey, Holder holder, int loadDistance, int simulationDistance,
+        LevelRenderer levelRenderer, boolean isDebug, long biomeZoomSeed,
+        int seaLevel, CallbackInfo ci
+    ) {
+    *///?}
         ClientLevel clientWorld = (ClientLevel) (Object) this;
         ClientChunkCache myClientChunkManager =
             O_O.createMyClientChunkManager(clientWorld, loadDistance);
@@ -161,7 +178,11 @@ public abstract class MixinClientLevel implements IEClientWorld {
     
     @Override
     public void ip_resetWorldRendererRef() {
-        levelRenderer = null;
+        //? if >=26.2 {
+        levelExtractor = null;
+        //?} else {
+        /*levelRenderer = null;
+        *///?}
     }
     
     @Override

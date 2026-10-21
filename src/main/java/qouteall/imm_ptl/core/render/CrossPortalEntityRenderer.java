@@ -6,7 +6,6 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -24,7 +23,6 @@ import qouteall.imm_ptl.core.collision.PortalCollisionEntry;
 import qouteall.imm_ptl.core.collision.PortalCollisionHandler;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.ducks.IEEntity;
-import qouteall.imm_ptl.core.ducks.IEWorldRenderer;
 import qouteall.imm_ptl.core.portal.Mirror;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.PortalManipulation;
@@ -37,6 +35,15 @@ import qouteall.q_misc_util.my_util.Plane;
 
 import java.util.WeakHashMap;
 
+/**
+ * Rendering entities that are halfway through a portal.
+ * <p>
+ * TODO port: 26.x renders entities through extracted render states and submitted features in a later frame graph
+ *  pass, there is no per-entity draw call anymore that could be clipped (1.21.1 drew the entity with an outer
+ *  clipping plane and drew its "projection" on the other side of the portal).
+ *  The entity filtering ({@link #shouldRenderEntityNow}) still works, the clipping and the projection rendering
+ *  ({@link #renderEntityProjections}) are not wired into the 26.x entity rendering.
+ */
 @Environment(EnvType.CLIENT)
 public class CrossPortalEntityRenderer {
     private static final Minecraft client = Minecraft.getInstance();
@@ -119,9 +126,6 @@ public class CrossPortalEntityRenderer {
                     for (PortalCollisionEntry e : collisionHandler.portalCollisions) {
                         Portal collidingPortal = e.portal;
                         
-                        //draw already built triangles
-                        client.renderBuffers().bufferSource().endBatch();
-                        
                         FrontClipping.setupOuterClipping(matrixStack, collidingPortal);
                     }
                 }
@@ -135,8 +139,6 @@ public class CrossPortalEntityRenderer {
         }
         if (!PortalRendering.isRendering()) {
             if (collidedEntities.containsKey(entity)) {
-                //draw it with culling in a separate draw call
-                client.renderBuffers().bufferSource().endBatch();
                 FrontClipping.disableClipping();
             }
         }
@@ -190,7 +192,7 @@ public class CrossPortalEntityRenderer {
                 if (!Portal.isFlippedPortal(((Portal) renderingPortal), collidingPortal)
                     && !Portal.isReversePortal(((Portal) renderingPortal), collidingPortal)
                 ) {
-                    Vec3 cameraPos = client.gameRenderer.getMainCamera().getPosition();
+                    Vec3 cameraPos = MyGameRenderer.getMainCamera().position();
                     
                     Plane innerClipping = collidingPortal.getInnerClipping();
                     
@@ -204,8 +206,6 @@ public class CrossPortalEntityRenderer {
         }
         else {
             FrontClipping.disableClipping();
-            // don't draw the existing triangles with culling enabled
-            client.renderBuffers().bufferSource().endBatch();
             
             FrontClipping.setupInnerClipping(
                 collidingPortal.getInnerClipping(), matrixStack.last().pose(), 0
@@ -220,7 +220,7 @@ public class CrossPortalEntityRenderer {
         Portal transformingPortal,
         PoseStack matrixStack
     ) {
-        Vec3 cameraPos = client.gameRenderer.getMainCamera().getPosition();
+        Vec3 cameraPos = MyGameRenderer.getMainCamera().position();
         
         ClientLevel newWorld = ClientWorldLoader.getWorld(transformingPortal.getDestDim());
         
@@ -297,15 +297,9 @@ public class CrossPortalEntityRenderer {
                 newCameraPos
             );
             
-            MultiBufferSource.BufferSource consumers = client.renderBuffers().bufferSource();
-            ((IEWorldRenderer) client.levelRenderer).ip_myRenderEntity(
-                entity,
-                newCameraPos.x, newCameraPos.y, newCameraPos.z,
-                RenderStates.getPartialTick(), matrixStack,
-                consumers
-            );
-            //immediately invoke draw call
-            consumers.endBatch();
+            // TODO port: render the entity with the moved camera position.
+            //  26.x needs an extracted EntityRenderState submitted to the SubmitNodeCollector of the
+            //  level rendering (LevelRenderer.submitEntities) instead of an immediate entity draw.
         }
         finally {
             matrixStack.popPose();
@@ -330,7 +324,7 @@ public class CrossPortalEntityRenderer {
         matrixStack.scale(scaling, scaling, scaling);
         
         if (portal.getRotation() != null) {
-            matrixStack.mulPose(portal.getRotation().toMcQuaternion());
+            matrixStack.mulPose(new Matrix4f().rotation(portal.getRotation().toMcQuaternion()));
         }
         
         matrixStack.translate(-anchor.x, -anchor.y, -anchor.z);
@@ -383,7 +377,7 @@ public class CrossPortalEntityRenderer {
             if (collidingPortal != null && !(entity instanceof LocalPlayer)) {
                 if (renderingPortal instanceof Portal) {
                     if (!Portal.isReversePortal(collidingPortal, ((Portal) renderingPortal))) {
-                        Vec3 cameraPos = PortalRenderer.client.gameRenderer.getMainCamera().getPosition();
+                        Vec3 cameraPos = MyGameRenderer.getMainCamera().position();
                         
                         boolean isHidden = cameraPos.subtract(collidingPortal.getOriginPos())
                             .dot(collidingPortal.getNormal()) < 0;
@@ -412,7 +406,7 @@ public class CrossPortalEntityRenderer {
         
         double distanceToCamera =
             getRenderingCameraPos(entity)
-                .distanceTo(client.gameRenderer.getMainCamera().getPosition());
+                .distanceTo(MyGameRenderer.getMainCamera().position());
         //avoid rendering player too near and block view except mirror
         return distanceToCamera > 1 || PortalRendering.isRenderingOddNumberOfMirrors();
     }

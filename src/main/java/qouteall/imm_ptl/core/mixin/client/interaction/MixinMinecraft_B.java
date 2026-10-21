@@ -8,13 +8,16 @@ import net.minecraft.world.phys.HitResult;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.Inject;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.block_manipulation.BlockManipulationClient;
 
 @Mixin(Minecraft.class)
 public abstract class MixinMinecraft_B {
     @Shadow
-    protected abstract void pickBlock();
+    protected abstract void pickBlockOrEntity();
     
     @Shadow
     public ClientLevel level;
@@ -23,7 +26,7 @@ public abstract class MixinMinecraft_B {
     public HitResult hitResult;
     
     @Shadow
-    protected int missTime;
+    public int missTime;
     
     @Shadow
     protected abstract boolean startAttack();
@@ -33,6 +36,24 @@ public abstract class MixinMinecraft_B {
     
     @Shadow
     protected abstract void startUseItem();
+    
+    // 26.x: GameRenderer.pick moved to Minecraft.pick (was MixinGameRenderer_B)
+    //do not update target when rendering portal
+    @Inject(method = "pick(F)V", at = @At("HEAD"), cancellable = true)
+    private void onUpdateTargetedEntity(float partialTick, CallbackInfo ci) {
+        if (level != null) {
+            if (WorldRenderInfo.isRendering()) {
+                ci.cancel();
+            }
+        }
+    }
+    
+    @Inject(method = "pick(F)V", at = @At("RETURN"))
+    private void onUpdateTargetedEntityFinish(float partialTick, CallbackInfo ci) {
+        if (level != null) {
+            BlockManipulationClient.updatePointedBlock(partialTick);
+        }
+    }
     
     @WrapOperation(
         method = "handleKeybinds",
@@ -104,7 +125,7 @@ public abstract class MixinMinecraft_B {
         method = "handleKeybinds",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/Minecraft;pickBlock()V"
+            target = "Lnet/minecraft/client/Minecraft;pickBlockOrEntity()V"
         )
     )
     private void wrapPickBlock(Minecraft instance, Operation<Void> original) {

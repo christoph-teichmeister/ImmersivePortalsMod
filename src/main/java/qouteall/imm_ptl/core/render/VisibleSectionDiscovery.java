@@ -60,7 +60,7 @@ public class VisibleSectionDiscovery {
         
         timeMark = System.nanoTime();
         
-        Vec3 cameraPos = camera.getPosition();
+        Vec3 cameraPos = camera.position();
         vanillaFrustum.prepare(cameraPos.x, cameraPos.y, cameraPos.z);
         cameraSectionPos = SectionPos.of(BlockPos.containing(cameraPos));
         
@@ -82,7 +82,7 @@ public class VisibleSectionDiscovery {
         else if (cameraPos.y < world.getMinY()) {
             discoverBottomOrTopLayerVisibleChunks(builtChunks.minSectionY);
         }
-        else if (cameraPos.y > world.getMaxBuildHeight()) {
+        else if (cameraPos.y > world.getMaxY()) {
             discoverBottomOrTopLayerVisibleChunks(builtChunks.endSectionY - 1);
         }
         else {
@@ -97,9 +97,10 @@ public class VisibleSectionDiscovery {
         // breadth-first searching
         while (!tempQueue.isEmpty()) {
             RenderSection curr = tempQueue.poll();
-            int cx = SectionPos.blockToSectionCoord(curr.getOrigin().getX());
-            int cy = SectionPos.blockToSectionCoord(curr.getOrigin().getY());
-            int cz = SectionPos.blockToSectionCoord(curr.getOrigin().getZ());
+            long sectionNode = curr.getSectionNode();
+            int cx = SectionPos.x(sectionNode);
+            int cy = SectionPos.y(sectionNode);
+            int cz = SectionPos.z(sectionNode);
             
             checkSection(cx + 1, cy, cz, false);
             checkSection(cx - 1, cy, cz, false);
