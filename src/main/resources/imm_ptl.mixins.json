@@ -101,6 +101,7 @@
     "client.particle.MixinParticleEngine",
     "client.particle.MixinParticleGroup",
     "client.particle.MixinQuadParticleGroup",
+    "client.render.IECamera_Accessor",
     "client.render.IEGameRenderState_Accessor",
     "client.render.IEGameRenderer_Accessor",
     "client.render.IELevelExtractor_Accessor",

@@ -40,6 +40,8 @@ import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.compat.sodium_compatibility.SodiumInterface;
 import qouteall.imm_ptl.core.ducks.IEMinecraftClient;
 import qouteall.imm_ptl.core.ducks.IEParticleManager;
+import qouteall.imm_ptl.core.ducks.IECamera;
+import qouteall.imm_ptl.core.mixin.client.render.IECamera_Accessor;
 import qouteall.imm_ptl.core.mixin.client.render.IEGameRenderState_Accessor;
 import qouteall.imm_ptl.core.mixin.client.render.IEGameRenderer_Accessor;
 import qouteall.imm_ptl.core.mixin.client.render.IELevelRenderer_Accessor;
@@ -281,6 +283,7 @@ public class MyGameRenderer {
         gameRendererAccess.ip_setLightmap(helper.lightmapTexture);
         gameRendererAccess.ip_setMainCamera(newCamera);
         newCamera.setLevel(newWorld);
+        copyCameraState(oldCamera, newCamera);
 
         ((IEGameRenderState_Accessor) gameRenderState).ip_setLevelRenderState(context.levelRenderState);
         levelRendererAccess.ip_setLevelRenderState(context.levelRenderState);
@@ -488,6 +491,23 @@ public class MyGameRenderer {
         FrontClipping.disableClipping();
     }
 
+    /**
+     * A new Camera has no ticked state, take it from the outer camera.
+     */
+    private static void copyCameraState(Camera from, Camera to) {
+        IECamera_Accessor fromAccess = (IECamera_Accessor) from;
+        IECamera_Accessor toAccess = (IECamera_Accessor) to;
+        toAccess.ip_setFovModifier(fromAccess.ip_getFovModifier());
+        toAccess.ip_setOldFovModifier(fromAccess.ip_getOldFovModifier());
+        ((IECamera) to).ip_setCameraY(((IECamera) from).ip_getCameraY(), ((IECamera) from).ip_getLastCameraY());
+        if (from.isPanoramicMode()) {
+            to.enablePanoramicMode();
+        }
+        if (from.entity() != null) {
+            to.setEntity(from.entity());
+        }
+    }
+    
     /**
      * See GameRenderer.render, which updates it with the outer camera position.
      */
