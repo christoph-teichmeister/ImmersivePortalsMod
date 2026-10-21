@@ -314,16 +314,13 @@ public class MyGameRenderer {
 
         IrisInterface.invoker.setPipeline(worldRenderer, null);
 
-        //update lightmap
-        if (!RenderStates.isDimensionRendered(newDimension)) {
-            helper.updateLightmap();
-        }
+        boolean updateLightmap = !RenderStates.isDimensionRendered(newDimension);
 
         //invoke rendering
         try {
             invokeWrapper.accept(() -> {
                 Profiler.get().push("render_portal_content");
-                extractAndRenderLevel(context, newCamera);
+                extractAndRenderLevel(context, newCamera, helper, updateLightmap);
                 Profiler.get().pop();
             });
         }
@@ -394,13 +391,22 @@ public class MyGameRenderer {
      * TODO port: the 1.21.1 cloud optimization (reusing the cloud mesh between portal views, CloudContext) is gone,
      *  a portal view of the same dimension with another cloud cell makes the CloudRenderer rebuild its mesh.
      */
-    private static void extractAndRenderLevel(NestedContext context, Camera camera) {
+    private static void extractAndRenderLevel(
+        NestedContext context, Camera camera, DimensionRenderHelper helper, boolean updateLightmap
+    ) {
         IEGameRenderer_Accessor gameRendererAccess = (IEGameRenderer_Accessor) client.gameRenderer;
         DeltaTracker deltaTracker = client.getDeltaTracker();
         float worldPartialTicks = deltaTracker.getGameTimeDeltaPartialTick(false);
 
         // the camera position is adjusted by WorldRenderInfo.adjustCameraPos in MixinCamera
         camera.update(deltaTracker);
+        // a new camera has no environment attribute samples yet (sky, fog and light colors come from them)
+        camera.attributeProbe().tick(client.level, camera.position());
+        
+        //update lightmap
+        if (updateLightmap) {
+            helper.updateLightmap();
+        }
 
         //? if >=26.3 {
         gameRendererAccess.ip_extractCamera(deltaTracker, worldPartialTicks);
@@ -453,9 +459,8 @@ public class MyGameRenderer {
             MyRenderHelper.applyMirrorFaceCulling();
         }
 
-        if (IPGlobal.enableDepthClampForPortalRendering) {
-            CHelper.enableDepthClamp();
-        }
+        // TODO port: IPGlobal.enableDepthClampForPortalRendering is ignored,
+        //  depth clamp would disable the oblique near plane that clips the content behind the portal
 
         //? if >=26.3 {
         client.levelRenderer.render(
@@ -475,9 +480,6 @@ public class MyGameRenderer {
         );
         *///?}
 
-        if (IPGlobal.enableDepthClampForPortalRendering) {
-            CHelper.disableDepthClamp();
-        }
 
         if (isMirror) {
             MyRenderHelper.recoverFaceCulling();

@@ -57,7 +57,12 @@ public class ViewAreaRenderer {
             MyRenderHelper.applyMirrorFaceCulling();
         }
 
-        CHelper.enableDepthClamp();
+        // depth clamp keeps the portal area when the camera touches the portal,
+        // but inside a portal view it would disable the oblique near plane clipping (see FrontClipping)
+        boolean depthClamp = !PortalRendering.isRendering();
+        if (depthClamp) {
+            CHelper.enableDepthClamp();
+        }
 
         GpuHelper.drawPositionColorTriangles(
             GpuHelper.getMainTarget(),
@@ -71,7 +76,9 @@ public class ViewAreaRenderer {
             )
         );
 
-        CHelper.disableDepthClamp();
+        if (depthClamp) {
+            CHelper.disableDepthClamp();
+        }
 
         if (shouldReverseCull) {
             MyRenderHelper.recoverFaceCulling();
