@@ -4,7 +4,8 @@
   "provides": [
     "iportal",
     "imm_ptl_core",
-    "immersive_portals_core"
+    "immersive_portals_core",
+    "dimlib"
   ],
   "version": "${version}",
   "name": "Immersive Portals",
@@ -27,12 +28,14 @@
     "main": [
       "qouteall.imm_ptl.peripheral.platform_specific.PeripheralModEntry",
       "qouteall.imm_ptl.core.platform_specific.IPModEntry",
-      "qouteall.q_misc_util.MiscUtilModEntry"
+      "qouteall.q_misc_util.MiscUtilModEntry",
+      "qouteall.dimlib.DimLibEntry"
     ],
     "client": [
       "qouteall.imm_ptl.peripheral.platform_specific.PeripheralModEntryClient",
       "qouteall.imm_ptl.core.platform_specific.IPModEntryClient",
-      "qouteall.q_misc_util.MiscUtilModEntryClient"
+      "qouteall.q_misc_util.MiscUtilModEntryClient",
+      "qouteall.dimlib.DimLibEntryClient"
     ],
     "server": [
       "qouteall.imm_ptl.core.platform_specific.IPModEntryDedicatedServer"
@@ -46,7 +49,8 @@
     "imm_ptl.mixins.json",
     "imm_ptl_fabric.mixins.json",
     "imm_ptl_compat.mixins.json",
-    "q_misc_util.mixins.json"
+    "q_misc_util.mixins.json",
+    "dimlib.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.5",

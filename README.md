@@ -1,4 +1,4 @@
-Update: this repo is not being maintained now. Forks are welcomed.
+This is a fork of the archived [iPortalTeam/ImmersivePortalsMod](https://github.com/iPortalTeam/ImmersivePortalsMod), ported to Fabric for Minecraft 26.1 to 26.3. It includes [DimLib](https://github.com/iPortalTeam/DimLib) (Apache-2.0, by qouteall) in `qouteall.dimlib`.
 
 # Immersive Portals Mod
 

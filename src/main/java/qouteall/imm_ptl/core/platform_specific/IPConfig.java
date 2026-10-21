@@ -19,6 +19,10 @@ public class IPConfig implements ConfigData {
     @ConfigEntry.Gui.Excluded
     public String check_the_wiki_for_more_information = "https://qouteall.fun/immptl/wiki/Config-Options";
     
+    // from the inlined DimLib: skip the "experimental settings" warning when loading a world
+    @ConfigEntry.Category("client")
+    public boolean suppressExperimentalWarning = false;
+    
     // client visible configs
     
     @ConfigEntry.Category("client")
