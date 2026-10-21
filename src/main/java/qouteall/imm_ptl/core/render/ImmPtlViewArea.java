@@ -26,6 +26,7 @@ import qouteall.imm_ptl.core.miscellaneous.GcMonitor;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 import qouteall.q_misc_util.Helper;
 //? if >=26.2 {
+import net.minecraft.client.SectionUpdateTracker;
 import net.minecraft.client.renderer.SectionOcclusionGraph;
 //?}
 
@@ -181,6 +182,30 @@ public class ImmPtlViewArea extends ViewArea {
     @Override
     public SectionRenderDispatcher.@Nullable RenderSection getRenderSectionAt(BlockPos pos) {
         return getRenderSection(SectionPos.asLong(pos));
+    }
+
+    /**
+     * Replaces the camera-centered SectionUpdateTracker, see MixinLevelExtractor.
+     * Like the tracker, the outer view only gets the sections around its camera
+     * ({@link #getRenderSection} only returns those when the section is compiled later in the frame).
+     */
+    public SectionUpdateTracker.@Nullable SectionDirtyState getDirtyState(long sectionNode, SectionPos cameraSectionPos) {
+        int sx = SectionPos.x(sectionNode);
+        int sz = SectionPos.z(sectionNode);
+        if (!WorldRenderInfo.isRendering() &&
+            (Math.abs(sx - cameraSectionPos.x()) > radius || Math.abs(sz - cameraSectionPos.z()) > radius)) {
+            return null;
+        }
+        RenderSection section = rawGet(sx, SectionPos.y(sectionNode), sz);
+        return section == null ? null : ((IERenderSection) section).ip_getDirtyState();
+    }
+
+    // a section that does not exist yet is dirty when it gets created
+    public void setDirty(int sectionX, int sectionY, int sectionZ, boolean playerChanged) {
+        RenderSection section = rawGet(sectionX, sectionY, sectionZ);
+        if (section != null) {
+            ((IERenderSection) section).ip_getDirtyState().setDirty(playerChanged);
+        }
     }
     //?} else {
     /*@Override

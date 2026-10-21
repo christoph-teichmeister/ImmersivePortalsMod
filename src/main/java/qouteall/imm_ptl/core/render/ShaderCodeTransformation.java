@@ -13,8 +13,9 @@ import java.util.Set;
 
 /**
  * GLSL source transformation that injects the clip plane into shaders (configured in shader_transformation.yaml).
- * TODO port: not hooked into the 26.x shader loading (ShaderManager / pipeline compilation, SPIR-V in 26.3).
- *  The portal clipping uses an oblique projection instead, see FrontClipping.
+ * Only the Sodium/Iris compat mixins use it (excluded from the build until the compat port).
+ * The vanilla 26.x shaders are not transformed: the content behind the portal is clipped
+ * with an oblique near plane instead, see FrontClipping.
  */
 public class ShaderCodeTransformation {
     private static final Logger LOGGER = LogUtils.getLogger();

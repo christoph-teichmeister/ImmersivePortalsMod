@@ -160,8 +160,6 @@ public class ExampleGuiPortalRendering {
         @Override
         public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float delta) {
             super.extractRenderState(guiGraphics, mouseX, mouseY, delta);
-            // TODO port: drawing the framebuffer directly during GUI extraction is immediate-mode;
-            //  26.x GUI rendering is deferred (render port decides how GuiPortalRendering is drawn)
             
             double t1 = CHelper.getSmoothCycles(503);
             double t2 = CHelper.getSmoothCycles(197);
@@ -202,9 +200,7 @@ public class ExampleGuiPortalRendering {
             int h = minecraft.getWindow().getHeight();
             int w = minecraft.getWindow().getWidth();
             MyRenderHelper.drawFramebufferWithBounds(
-                frameBuffer,
-                true, // enable alpha blend
-                false, // don't modify alpha
+                guiGraphics, frameBuffer,
                 (int) (w * 0.2f), (int) (w * 0.8f),
                 (int) (h * 0.2f), (int) (h * 0.8f)
             );

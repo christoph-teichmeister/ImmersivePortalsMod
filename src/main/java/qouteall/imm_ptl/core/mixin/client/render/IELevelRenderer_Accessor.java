@@ -1,6 +1,7 @@
 package qouteall.imm_ptl.core.mixin.client.render;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.renderer.CloudRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LevelTargetBundle;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -65,4 +66,11 @@ public interface IELevelRenderer_Accessor {
     @Mutable
     @Accessor("nearbyVisibleSections")
     void ip_setNearbyVisibleSections(ObjectArrayList<SectionRenderDispatcher.RenderSection> arg);
+    
+    @Accessor("cloudRenderer")
+    CloudRenderer ip_getCloudRenderer();
+    
+    @Mutable
+    @Accessor("cloudRenderer")
+    void ip_setCloudRenderer(CloudRenderer arg);
 }

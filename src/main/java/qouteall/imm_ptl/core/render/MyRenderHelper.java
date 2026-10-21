@@ -1,10 +1,16 @@
 package qouteall.imm_ptl.core.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.state.gui.BlitRenderState;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix3x2f;
 import org.joml.Matrix4fc;
 import qouteall.imm_ptl.core.CHelper;
 import qouteall.imm_ptl.core.ClientWorldLoader;
@@ -12,6 +18,14 @@ import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
+
+//? if >=26.3 {
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
+//?} else {
+/*import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuTextureView;
+*///?}
 
 import static org.lwjgl.opengl.GL11.GL_BACK;
 import static org.lwjgl.opengl.GL11.GL_FRONT;
@@ -81,8 +95,7 @@ public class MyRenderHelper {
     }
 
     /**
-     * Draws the framebuffer onto the current main render target.
-     * 26.x: the blit always covers the whole target; the viewport arguments of the 1.21.1 variants are ignored.
+     * Draws the framebuffer onto the whole current main render target.
      */
     public static void drawScreenFrameBuffer(
         RenderTarget textureProvider,
@@ -97,36 +110,27 @@ public class MyRenderHelper {
         );
     }
 
-    public static void drawFramebuffer(
-        RenderTarget textureProvider, boolean doUseAlphaBlend, boolean doEnableModifyAlpha,
-        float xMin, float xMax, float yMin, float yMax
-    ) {
-        drawScreenFrameBuffer(textureProvider, doUseAlphaBlend, doEnableModifyAlpha);
-    }
-
-    public static void drawFramebufferWithViewport(
-        RenderTarget textureProvider, boolean doUseAlphaBlend, boolean doEnableModifyAlpha,
-        float left, float right, float bottom, float up,
-        int viewportWidth, int viewportHeight
-    ) {
-        drawScreenFrameBuffer(textureProvider, doUseAlphaBlend, doEnableModifyAlpha);
-    }
-
-    // TODO port: 26.x render passes always use the full attachment as viewport,
-    //  drawing the framebuffer into a sub-rectangle (used by GUI portal rendering) needs a
-    //  custom pipeline with a position transform. Draws onto the whole target for now.
+    /**
+     * Draws the framebuffer into a rectangle of the screen (window pixels, y downwards), as a GUI element:
+     * 26.x screens only extract GUI state, the GUI renderer draws it later in the frame.
+     * The framebuffer content is premultiplied, see {@link #drawScreenFrameBuffer}.
+     */
     public static void drawFramebufferWithBounds(
-        RenderTarget textureProvider, boolean doUseAlphaBlend, boolean doEnableModifyAlpha,
+        GuiGraphicsExtractor guiGraphics, RenderTarget textureProvider,
         int xMin, int xMax, int yMin, int yMax
     ) {
-        drawScreenFrameBuffer(textureProvider, doUseAlphaBlend, doEnableModifyAlpha);
-    }
-
-    public static void drawFramebufferWithCoordinatesAndDimensions(
-        RenderTarget textureProvider, boolean doUseAlphaBlend, boolean doEnableModifyAlpha,
-        int x, int y, int viewportWidth, int viewportHeight
-    ) {
-        drawScreenFrameBuffer(textureProvider, doUseAlphaBlend, doEnableModifyAlpha);
+        GpuTextureView textureView = textureProvider.getColorTextureView();
+        if (textureView == null) {
+            return;
+        }
+        Matrix3x2f windowPixelPose = new Matrix3x2f(guiGraphics.pose())
+            .scale(1.0f / client.getWindow().getGuiScale());
+        // the framebuffer texture is bottom-up, hence v from 1 to 0
+        guiGraphics.guiRenderState.addGuiElement(new BlitRenderState(
+            RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
+            TextureSetup.singleTexture(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)),
+            windowPixelPose, xMin, yMin, xMax, yMax, 0, 1, 1, 0, -1, null
+        ));
     }
 
     // it will remove the light sections that are marked to be removed
